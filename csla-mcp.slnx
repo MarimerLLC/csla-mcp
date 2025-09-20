@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="readme.md" />
+  </Folder>
+  <Project Path="csla-mcp.AppHost/csla-mcp.AppHost.csproj" />
+  <Project Path="csla-mcp.Server/csla-mcp.Server.csproj" />
+  <Project Path="csla-mcp.ServiceDefaults/csla-mcp.ServiceDefaults.csproj" />
+  <Project Path="csla-mcp.Tests/csla-mcp.Tests.csproj" />
+</Solution>
