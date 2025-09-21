@@ -1,3 +1,17 @@
+# BusinessClass
+
+* CSLA version: 8 and higher
+* Lanaguage: C#
+
+This example demonstrates a complete CSLA business class named `Customer` that includes various property types, business rules, authorization rules, and data access methods. The class derives from `BusinessBase<T>` and includes both read-only and read-write properties.
+
+This class demonstrates the editable root business class stereotype.
+
+It also shows how to implement business rules for validation, including required fields, string length constraints, and a custom rule to ensure email uniqueness. Additionally, it includes object-level authorization rules to control access based on user roles.
+
+It also includes data portal operation methods for creating, fetching, inserting, updating, and deleting customer records. Note that the data access methods contain placeholder comments where actual data access logic should be invoked.
+
+```csharp
 using System;
 using System.ComponentModel.DataAnnotations;
 using Csla;
@@ -76,75 +90,92 @@ namespace CslaExamples
         }
 
         [Create]
-        private void Create()
+        private async Task Create([Inject] ICustomerDal customerDal)
         {
-            // Initialize default values for new object
-            LoadProperty(CreatedDateProperty, DateTime.Now);
-            LoadProperty(IsActiveProperty, true);
+            // Call DAL Create method to get default values
+            var customerData = await customerDal.Create();
+            
+            // Load default values from DAL
+            LoadProperty(CreatedDateProperty, customerData.CreatedDate);
+            LoadProperty(IsActiveProperty, customerData.IsActive);
             
             BusinessRules.CheckRules();
         }
 
         [Fetch]
-        private void Fetch(int id)
+        private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
         {
-            // Simulate data access - replace with actual data access logic
-            // Example: using Entity Framework, ADO.NET, etc.
+            // Get data from DAL
+            var customerData = await customerDal.Get(id);
             
-            // For demonstration purposes, creating sample data
-            if (id > 0)
+            // Load properties from DAL data
+            if (customerData != null)
             {
-                LoadProperty(IdProperty, id);
-                LoadProperty(NameProperty, $"Customer {id}");
-                LoadProperty(EmailProperty, $"customer{id}@example.com");
-                LoadProperty(CreatedDateProperty, DateTime.Now.AddDays(-30));
-                LoadProperty(IsActiveProperty, true);
+                LoadProperty(IdProperty, customerData.Id);
+                LoadProperty(NameProperty, customerData.Name);
+                LoadProperty(EmailProperty, customerData.Email);
+                LoadProperty(CreatedDateProperty, customerData.CreatedDate);
+                LoadProperty(IsActiveProperty, customerData.IsActive);
             }
             else
             {
-                throw new ArgumentException("Invalid customer ID");
+                throw new ArgumentException($"Customer {id} not found");
             }
+
+            BusinessRules.CheckRules();
+        }
+
+        private static CustomerData CreateCustomerData(Customer customer)
+        {
+            return new CustomerData
+            {
+                Id = customer.ReadProperty(IdProperty),
+                Name = customer.ReadProperty(NameProperty),
+                Email = customer.ReadProperty(EmailProperty),
+                CreatedDate = customer.ReadProperty(CreatedDateProperty),
+                IsActive = customer.ReadProperty(IsActiveProperty)
+            };
         }
 
         [Insert]
-        private void Insert()
+        private async Task Insert([Inject] ICustomerDal customerDal)
         {
-            // Simulate insert operation
-            // In real implementation, this would save to database
+            // Prepare customerData with current property values
+            var customerData = CreateCustomerData(this);
             
-            // Simulate generating new ID
-            LoadProperty(IdProperty, new Random().Next(1000, 9999));
-            LoadProperty(CreatedDateProperty, DateTime.Now);
+            // Call DAL Upsert method for insert and get result with new ID
+            var result = await customerDal.Upsert(customerData);
             
-            // Mark as old (saved) object
-            MarkOld();
+            // Load the new ID from the result
+            LoadProperty(IdProperty, result.Id);
+            LoadProperty(CreatedDateProperty, result.CreatedDate);
         }
 
         [Update]
-        private void Update()
+        private async Task Update([Inject] ICustomerDal customerDal)
         {
-            // Simulate update operation
-            // In real implementation, this would update the database record
+            // Prepare customerData with current property values
+            var customerData = CreateCustomerData(this);
             
-            // Mark as old (saved) object
-            MarkOld();
+            // Call DAL Upsert method for update
+            await customerDal.Upsert(customerData);
         }
 
         [DeleteSelf]
-        private void DeleteSelf()
+        private async Task DeleteSelf([Inject] ICustomerDal customerDal)
         {
-            // Simulate delete operation
-            // In real implementation, this would delete from database
+            // Call DAL Delete method
+            await customerDal.Delete(ReadProperty(IdProperty));
             
-            // Mark for deletion
+            // Mark as new
             MarkNew();
         }
 
         [Delete]
-        private void Delete(int id)
+        private async Task Delete(int id, [Inject] ICustomerDal customerDal)
         {
-            // Static delete operation
-            // In real implementation, this would delete from database by ID
+            // Call DAL Delete method
+            await customerDal.Delete(id);
         }
 
         private class EmailUniqueRule : Rules.BusinessRule
@@ -172,3 +203,4 @@ namespace CslaExamples
         }
     }
 }
+```
