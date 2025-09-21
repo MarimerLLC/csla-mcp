@@ -16,37 +16,68 @@ The CSLA MCP Server provides AI coding assistants with access to official CSLA .
 
 ## MCP Tools
 
-The server provides three main MCP tools:
+The server currently exposes two MCP tools implemented in `CslaMcpServer.Tools.CslaCodeTool`:
 
-### 1. get_csla_example
+- `Search` — search code samples and markdown snippets for keyword matches and return scored results.
+- `Fetch` — return the raw content of a named code sample or markdown file.
 
-Get CSLA code examples for specific concepts.
+Both tools operate over the repository folder that contains the example files: `csla-examples/` (the tool uses an absolute path in the server code: `s:\src\rdl\csla-mcp\csla-examples\`).
 
-**Parameters:**
-- `concept` (required): The CSLA concept (e.g., 'business-object', 'data-portal', 'authorization')
-- `category` (optional): Category filter (e.g., 'basic', 'advanced', 'patterns')
+### Tool: Search
 
-### 2. list_csla_concepts
+Description: Extracts significant words from the provided input text and searches `.cs` and `.md` files under the examples folder for occurrences of those words. Returns a JSON array of results ordered by score (total matching-word counts).
 
-List all available CSLA concepts and categories.
+Parameters:
+- `message` (string, required): Natural language text or keywords to search for. Words of length 4 or less are ignored by the tool.
 
-**Example:**
+Output: JSON array of objects with the shape:
+
+- `Score` (int): total number of matching word occurrences across the file
+- `FileName` (string): file name (without path)
+- `MatchingWords` (array): list of `{ Word, Count }` objects showing which search terms matched and how many times
+
+Example call (MCP `tools/call`):
+
 ```json
 {
   "method": "tools/call",
   "params": {
-    "name": "list_csla_concepts",
-    "arguments": {}
+    "name": "Search",
+    "arguments": { "message": "data portal authorization business object" }
   }
 }
 ```
 
-### 3. search_csla_examples
+Notes and behavior:
+- The tool ignores short words (<= 3 characters) when building the search terms.
+- Matching is case-insensitive and counts multiple occurrences in a file.
+- Results are ordered by `Score` descending, then by filename.
 
-Search for CSLA examples using semantic search.
+### Tool: Fetch
 
-**Parameters:**
-- `query` (required): Search query to find relevant examples
+Description: Returns the text contents of a specific file from the `csla-examples/` folder by file name.
+
+Parameters:
+- `fileName` (string, required): The name of the file to fetch (for example, `ReadOnlyProperty.md` or `MyBusinessClass.cs`). The tool resolves the file by combining the configured examples path with the given file name.
+
+Output: Raw file contents as a string. If the file is not found the tool returns a simple error message string like `"File 'X' not found."`.
+
+Example call (MCP `tools/call`):
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "Fetch",
+    "arguments": { "fileName": "ReadOnlyProperty.md" }
+  }
+}
+```
+
+Security note:
+- The current implementation combines the configured absolute path and the provided `fileName` directly and does not perform additional validation to prevent path traversal. When exposing these tools remotely, consider adding validation to ensure only allowed files are returned.
+
+If you need the previous higher-level tools such as `get_csla_example`, `list_csla_concepts`, or a semantic search wrapper, those are not implemented in `CslaCodeTool.cs` and would need to be added separately.
 
 ## Integration with AI Assistants
 
