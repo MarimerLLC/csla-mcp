@@ -1,0 +1,6 @@
+@csla_mpc_server_HostAddress = http://localhost:5292
+
+GET {{csla_mpc_server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

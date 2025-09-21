@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "csla-mcp-server", "csla-mcp-server\csla-mcp-server.csproj", "{91F8FEB4-628C-D193-FA56-A582E87B0A24}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{91F8FEB4-628C-D193-FA56-A582E87B0A24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91F8FEB4-628C-D193-FA56-A582E87B0A24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91F8FEB4-628C-D193-FA56-A582E87B0A24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91F8FEB4-628C-D193-FA56-A582E87B0A24}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3D448CFC-803E-41A0-A880-E266D9431BE4}
+	EndGlobalSection
+EndGlobal
