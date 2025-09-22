@@ -1,7 +1,4 @@
-# BusinessClass
-
-* CSLA version: 8 and higher
-* Lanaguage: C#
+# Editable Business Class
 
 This example demonstrates a complete CSLA business class named `Customer` that includes various property types, business rules, authorization rules, and data access methods. The class derives from `BusinessBase<T>` and includes both read-only and read-write properties.
 

@@ -1,4 +1,4 @@
-# ReadWriteProperty
+# Read-Write Property
 
 This snippet demonstrates how to define a read-write property using the CSLA property registration system. This is usefule for creating read-write properties that are part of an editable business class that derives from `BusinessBase<T>`.
 

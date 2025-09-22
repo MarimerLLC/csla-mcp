@@ -1,4 +1,4 @@
-# ReadOnlyProperty
+# Read-Only Property
 
 This snippet demonstrates how to define a read-only property using the CSLA property registration system. This is useful for creating read-only properties that are part of an editable business class that derives from `BusinessBase<T>` or a read-only business class that dervies from ReadOnlyBase<T>.
 

@@ -1,4 +1,4 @@
-# PrivateProperty
+# Private Property
 
 This snippet demonstrates how to define a private property using the CSLA property registration system. This is useful for creating private properties that are part of any business class that derives from a CSLA base class, such as `BusinessBase<T>`, `ReadOnlyBase<T>`, or `CommandBase<T>`.
 
