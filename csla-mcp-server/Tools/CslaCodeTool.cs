@@ -7,7 +7,8 @@ namespace CslaMcpServer.Tools
   [McpServerToolType]
   public class CslaCodeTool
   {
-    private static readonly string _codeSamplesPath = @"s:\src\rdl\csla-mcp\csla-examples\";
+    // Made configurable so Program.cs can set it from a CLI flag
+    public static string CodeSamplesPath { get; set; } = @"s:\src\rdl\csla-mcp\csla-examples\";
 
     public class WordMatch
     {
@@ -25,8 +26,8 @@ namespace CslaMcpServer.Tools
     [McpServerTool, Description("Searches the code samples and snippets for specific keywords. Returns a JSON array of search results with scores, file names, and matching words with their counts, ordered by score.")]
     public static string Search(string message)
     {
-      var csFiles = Directory.GetFiles(_codeSamplesPath, "*.cs", SearchOption.AllDirectories);
-      var mdFiles = Directory.GetFiles(_codeSamplesPath, "*.md", SearchOption.AllDirectories);
+      var csFiles = Directory.GetFiles(CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
+      var mdFiles = Directory.GetFiles(CodeSamplesPath, "*.md", SearchOption.AllDirectories);
       var allFiles = csFiles.Concat(mdFiles);
       
       // Extract words longer than 4 characters from the message
@@ -47,7 +48,7 @@ namespace CslaMcpServer.Tools
       
       foreach (var file in allFiles)
       {
-        var content = File.ReadAllText(file).ToLowerInvariant();
+        var content = File.ReadAllText(file);
         var matchingWords = new List<WordMatch>();
         var totalScore = 0;
         
@@ -95,7 +96,7 @@ namespace CslaMcpServer.Tools
     [McpServerTool, Description("Fetches a specific code sample or snippet by name. Returns the content of the file.")]
     public static string Fetch(string fileName)
     {
-      var filePath = Path.Combine(_codeSamplesPath, fileName);
+      var filePath = Path.Combine(CodeSamplesPath, fileName);
       if (File.Exists(filePath))
       {
         return File.ReadAllText(filePath);
