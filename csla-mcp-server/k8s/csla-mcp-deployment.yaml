@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csla-mcp-server
+  labels:
+    app: csla-mcp-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: csla-mcp-server
+  template:
+    metadata:
+      labels:
+        app: csla-mcp-server
+    spec:
+      containers:
+        - name: csla-mcp-server
+          # Image built locally by `build-image.ps1` / `build-image.sh` (name: `csla-mcp-server`)
+          image: rockylhotka/csla-mcp-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            # Example: override URLS if needed
+            - name: ASPNETCORE_URLS
+              value: "http://+:80"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+      # Optional image pull secrets, node selectors, tolerations could be added here
+
+---
+# Expose the Deployment internally. Set type: LoadBalancer for cloud clusters or NodePort for bare metal.
+apiVersion: v1
+kind: Service
+metadata:
+  name: csla-mcp-server
+  labels:
+    app: csla-mcp-server
+spec:
+  type: LoadBalancer
+  selector:
+    app: csla-mcp-server
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
