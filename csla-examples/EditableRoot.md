@@ -1,6 +1,6 @@
-# Editable Business Class
+# Editable Root Stereotype
 
-This example demonstrates a complete CSLA business class named `Customer` that includes various property types, business rules, authorization rules, and data access methods. The class derives from `BusinessBase<T>` and includes both read-only and read-write properties.
+This example demonstrates a complete CSLA business class named `CustomerEdit` that includes various property types, business rules, authorization rules, and data access methods. The class derives from `BusinessBase<T>` and includes both read-only and read-write properties.
 
 This class demonstrates the editable root business class stereotype.
 
@@ -16,7 +16,7 @@ using Csla;
 namespace CslaExamples
 {
     [Serializable]
-    public class Customer : BusinessBase<Customer>
+    public class CustomerEdit : BusinessBase<CustomerEdit>
     {
         public static readonly PropertyInfo<int> IdProperty = RegisterProperty<int>(nameof(Id));
         public int Id
