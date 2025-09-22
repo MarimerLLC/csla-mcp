@@ -114,3 +114,36 @@ For questions about CSLA .NET, visit:
 - [CSLA .NET Website](https://cslanet.com/)
 - [CSLA .NET GitHub](https://github.com/MarimerLLC/csla)
 - [CSLA .NET Discussions](https://github.com/MarimerLLC/csla/discussions)
+
+## Docker: Build and Run
+
+This project includes a multi-stage `Dockerfile` for the `csla-mcp-server` located at `csla-mcp-server/Dockerfile` that builds and publishes the app, then produces a small runtime image.
+
+Below are PowerShell-friendly (Windows) commands to build and run the container locally. Run these from the repository root (`s:\src\rdl\csla-mcp`) or adjust paths if running from elsewhere.
+
+1) Build the Docker image (tags the image as `csla-mcp-server:latest`):
+
+```powershell
+docker build -f csla-mcp-server/Dockerfile -t csla-mcp-server:latest .
+```
+
+2) Run the container (maps container port 80 to host port 8080):
+
+```powershell
+docker run --rm -p 8080:80 --name csla-mcp-server csla-mcp-server:latest
+```
+
+3) Open your browser to `http://localhost:8080` (or the mapped host port) to access the server. If the server uses a different default endpoint, consult the project `Program.cs` or the server logs printed to the container.
+
+Optional: Build with a different tag and pass an environment variable for ASP.NET Core URLs (already set in the Dockerfile):
+
+```powershell
+docker build -f csla-mcp-server/Dockerfile -t myregistry/csla-mcp-server:v1.0 .
+docker run --rm -p 8080:80 --name csla-mcp-server -e ASPNETCORE_ENVIRONMENT=Development myregistry/csla-mcp-server:v1.0
+```
+
+Notes:
+- The `Dockerfile` uses .NET 10 SDK and ASP.NET runtime images. Ensure your Docker installation supports the required base images.
+- The Docker build will run a `dotnet publish` inside the container; it may take a few minutes the first time as NuGet packages are restored.
+- If you need to debug or iterate quickly during development, consider running the app locally with `dotnet run --project csla-mcp-server/csla-mcp-server.csproj` instead of rebuilding the image for every change.
+
