@@ -48,6 +48,15 @@ jobs:
     - name: Test Docker image
       run: |
         docker run --rm -d -p 8080:80 --name test-container csla-mcp-server
-        sleep 10
-        curl -f http://localhost:8080/mcp/health || exit 1
+        # wait up to 30s for the container to be ready (retrying curl)
+        for i in {1..30}; do
+          if curl -sSf http://localhost:8080/mcp/health; then
+            echo "container ready"
+            break
+          fi
+          echo "waiting for container... ($i)"
+          sleep 1
+        done
+        # fail if still not ready
+        curl -f http://localhost:8080 || (docker logs test-container && exit 1)
         docker stop test-container
