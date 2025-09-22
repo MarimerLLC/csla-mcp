@@ -16,6 +16,41 @@ public sealed class RunCommand : Command<AppSettings>
 {
     public override int Execute([NotNull] CommandContext context, [NotNull] AppSettings settings)
     {
+        // Priority: CLI (-f) > ENV CSLA_CODE_SAMPLES_PATH > default
+        // First, check environment variable and apply it if present (validation will be performed)
+        var envPath = Environment.GetEnvironmentVariable("CSLA_CODE_SAMPLES_PATH");
+        if (!string.IsNullOrWhiteSpace(envPath))
+        {
+            try
+            {
+                var envFull = Path.GetFullPath(envPath);
+                if (!envFull.EndsWith(Path.DirectorySeparatorChar)) envFull += Path.DirectorySeparatorChar;
+
+                if (!Directory.Exists(envFull))
+                {
+                    Console.Error.WriteLine($"Error: The environment variable CSLA_CODE_SAMPLES_PATH is set to '{envFull}' but that folder does not exist.");
+                    return 4;
+                }
+
+                var envHasFiles = Directory.EnumerateFiles(envFull, "*.cs", SearchOption.AllDirectories).Any()
+                    || Directory.EnumerateFiles(envFull, "*.md", SearchOption.AllDirectories).Any();
+
+                if (!envHasFiles)
+                {
+                    Console.Error.WriteLine($"Error: The environment variable CSLA_CODE_SAMPLES_PATH is set to '{envFull}' but that folder does not contain any .cs or .md files.");
+                    return 5;
+                }
+
+                CslaCodeTool.CodeSamplesPath = envFull;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error: Failed to process CSLA_CODE_SAMPLES_PATH environment variable: {ex.Message}");
+                return 6;
+            }
+        }
+
+        // Then, if CLI option is present it overrides the environment variable
         if (!string.IsNullOrWhiteSpace(settings.Folder))
         {
             // Resolve and normalize folder path

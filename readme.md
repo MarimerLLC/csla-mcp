@@ -147,3 +147,70 @@ Notes:
 - The Docker build will run a `dotnet publish` inside the container; it may take a few minutes the first time as NuGet packages are restored.
 - If you need to debug or iterate quickly during development, consider running the app locally with `dotnet run --project csla-mcp-server/csla-mcp-server.csproj` instead of rebuilding the image for every change.
 
+### Docker: pass the code samples folder into the container
+
+When running the server in Docker you can mount your host `csla-examples` folder into the container and set the `CSLA_CODE_SAMPLES_PATH` environment variable so the server uses your host examples.
+
+Example (Linux/macOS or Docker Desktop using Linux containers):
+
+```bash
+docker run --rm -p 8080:80 \
+  -v "/path/on/host/csla-examples:/app/examples" \
+  -e CSLA_CODE_SAMPLES_PATH="/app/examples" \
+  --name csla-mcp-server csla-mcp-server:latest
+```
+
+Example (PowerShell on Windows):
+
+```powershell
+docker run --rm -p 8080:80 `
+  -v "S:\src\rdl\csla-mcp\csla-examples:/app/examples" `
+  -e CSLA_CODE_SAMPLES_PATH="/app/examples" `
+  --name csla-mcp-server csla-mcp-server:latest
+```
+
+Notes:
+- Mount the host examples folder to a path inside the container (for example `/app/examples`) and set the `CSLA_CODE_SAMPLES_PATH` env var to that in-container path.
+- The CLI `-f` flag still overrides the environment variable if you supply it to the container command.
+- If running Windows containers, adjust the mount target and path style appropriately.
+
+## Configuring the code samples folder
+
+The MCP server reads code samples and markdown examples from a configurable folder. There are three ways to control which folder is used (priority from highest to lowest):
+
+1. Command-line flag `-f` / `--folder` when launching the server
+2. Environment variable `CSLA_CODE_SAMPLES_PATH`
+3. Built-in default path used by the server code
+
+The command-line flag always overrides the environment variable. If neither is provided the server uses the default examples path (the original behavior).
+
+Examples
+
+- Run and point to a folder using the `-f` option (PowerShell):
+
+```powershell
+dotnet run --project csla-mcp-server -- -f "S:\src\rdl\csla-mcp\csla-examples"
+```
+
+- Set the environment variable (PowerShell) and run (no `-f`, env will be used):
+
+```powershell
+$env:CSLA_CODE_SAMPLES_PATH = 'S:\src\rdl\csla-mcp\csla-examples'
+dotnet run --project csla-mcp-server --
+```
+
+- One-off launch with env var from cmd.exe (Windows):
+
+```cmd
+set CSLA_CODE_SAMPLES_PATH=S:\src\rdl\csla-mcp\csla-examples && dotnet run --project csla-mcp-server --
+```
+
+Validation and errors
+
+- The server validates the provided folder on startup. If the folder does not exist or does not contain any `.cs` or `.md` files the server will print a helpful error and exit with a non-zero code.
+- Exit codes used for validation failures:
+  - `2` — CLI folder does not exist
+  - `3` — CLI folder exists but contains no `.cs` or `.md` files
+  - `4` — ENV folder does not exist
+  - `5` — ENV folder exists but contains no `.cs` or `.md` files
+  - `6` — ENV variable could not be processed (unexpected error)
