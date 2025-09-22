@@ -43,11 +43,11 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Build Docker image
-      run: docker build -t csla-mcp-server .
+      run: docker build -t csla-mcp-server csla-mcp-server
       
     - name: Test Docker image
       run: |
-        docker run --rm -d -p 8080:8080 --name test-container csla-mcp-server
+        docker run --rm -d -p 8080:80 --name test-container csla-mcp-server
         sleep 10
         curl -f http://localhost:8080/mcp/health || exit 1
         docker stop test-container
