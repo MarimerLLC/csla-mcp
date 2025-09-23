@@ -31,15 +31,18 @@ public class MyCommand : CommandBase<MyCommand>
     private void Create()
     { }
 
-    [Create]
-    private void Create(string input)
+    [Execute]
+    private async Task Execute(int input, [Inject] IMyService myService)
     {
-        Input = input;
+        //NOTE: the Input property is not necessary in this scenario
+        // Perform the command operation
+        Result = await myService.ProcessInputAsync(input);
     }
 
     [Execute]
     private async Task Execute([Inject] IMyService myService)
     {
+        // NOTE: the Input property is necessary in this scenario
         // Perform the command operation
         Result = await myService.ProcessInputAsync(Input);
     }
@@ -55,9 +58,11 @@ The `ReadProperty` and `LoadProperty` methods are used to get and set property v
 You can use the Execute and Evaluate form like this:
 
 ```csharp
-var command = await myCommandPortal.ExecuteAsync(myCommandPortal.Create<MyCommand>("Initial Input"));
+var command = await myCommandPortal.ExecuteAsync("Initial Input");
 var result = command.Result;
 ```
+
+In this case, the command object is created on the logical server, executed, and the result is evaluated after execution. This is the simpler and more modern approach.
 
 Or the Create, Load, Execute, Evaluate form like this:
 
@@ -68,6 +73,6 @@ await DataPortal.ExecuteAsync(command);
 var result = command.Result;
 ```
 
-In both cases, the command object is created, executed, and the result is evaluated after execution.
+In this case, the command object is created, provided to the client, loaded with values, executed, and the result is evaluated after execution.
 
 These examples assume you have a pre-existing `myCommandPortal` instance of `IDataPortal<MyCommand>` via dependency injection or other means.
