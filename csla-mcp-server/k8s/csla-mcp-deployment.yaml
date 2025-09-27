@@ -5,7 +5,7 @@ metadata:
   labels:
     app: csla-mcp-server
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: csla-mcp-server
@@ -16,9 +16,9 @@ spec:
     spec:
       containers:
         - name: csla-mcp-server
-          # Image built locally by `build-image.ps1` / `build-image.sh` (name: `csla-mcp-server`)
-          image: csla-mcp-server:latest
-          imagePullPolicy: IfNotPresent
+          # Image pulled from Docker Hub
+          image: rockylhotka/csla-mcp-server:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http
