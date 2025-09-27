@@ -17,17 +17,17 @@ spec:
       containers:
         - name: csla-mcp-server
           # Image built locally by `build-image.ps1` / `build-image.sh` (name: `csla-mcp-server`)
-          image: rockylhotka/csla-mcp-server:latest
+          image: csla-mcp-server:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80
+            - containerPort: 5292
               name: http
           env:
             - name: ASPNETCORE_ENVIRONMENT
               value: "Production"
-            # Example: override URLS if needed
+            # Override URLs to listen on HTTP port 5292 inside the container
             - name: ASPNETCORE_URLS
-              value: "http://+:80"
+              value: "http://+:5292"
           resources:
             requests:
               cpu: "100m"
@@ -37,16 +37,16 @@ spec:
               memory: "512Mi"
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 15
             periodSeconds: 20
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
       # Optional image pull secrets, node selectors, tolerations could be added here
@@ -64,7 +64,7 @@ spec:
   selector:
     app: csla-mcp-server
   ports:
-    - port: 80
+    - port: 5292
       targetPort: http
       protocol: TCP
       name: http

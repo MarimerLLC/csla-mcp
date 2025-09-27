@@ -5,6 +5,7 @@ using CslaMcpServer.Tools;
 using Spectre.Console.Cli;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using Csla.Configuration;
 
 public sealed class AppSettings : CommandSettings
 {
@@ -16,11 +17,17 @@ public sealed class RunCommand : Command<AppSettings>
 {
     public override int Execute([NotNull] CommandContext context, [NotNull] AppSettings settings)
     {
+        // Log startup information
+        Console.WriteLine($"[Startup] Current working directory: {Directory.GetCurrentDirectory()}");
+        Console.WriteLine($"[Startup] Application base directory: {AppDomain.CurrentDomain.BaseDirectory}");
+        Console.WriteLine($"[Startup] Default CodeSamplesPath: {CslaCodeTool.CodeSamplesPath}");
+        
         // Priority: CLI (-f) > ENV CSLA_CODE_SAMPLES_PATH > default
         // First, check environment variable and apply it if present (validation will be performed)
         var envPath = Environment.GetEnvironmentVariable("CSLA_CODE_SAMPLES_PATH");
         if (!string.IsNullOrWhiteSpace(envPath))
         {
+            Console.WriteLine($"[Startup] Found environment variable CSLA_CODE_SAMPLES_PATH: {envPath}");
             try
             {
                 var envFull = Path.GetFullPath(envPath);
@@ -42,6 +49,7 @@ public sealed class RunCommand : Command<AppSettings>
                 }
 
                 CslaCodeTool.CodeSamplesPath = envFull;
+                Console.WriteLine($"[Startup] Using CodeSamplesPath from environment: {envFull}");
             }
             catch (Exception ex)
             {
@@ -49,10 +57,15 @@ public sealed class RunCommand : Command<AppSettings>
                 return 6;
             }
         }
+        else
+        {
+            Console.WriteLine("[Startup] No CSLA_CODE_SAMPLES_PATH environment variable found");
+        }
 
         // Then, if CLI option is present it overrides the environment variable
         if (!string.IsNullOrWhiteSpace(settings.Folder))
         {
+            Console.WriteLine($"[Startup] CLI folder option provided: {settings.Folder}");
             // Resolve and normalize folder path
             var fullPath = Path.GetFullPath(settings.Folder);
             if (!fullPath.EndsWith(Path.DirectorySeparatorChar)) fullPath += Path.DirectorySeparatorChar;
@@ -75,12 +88,30 @@ public sealed class RunCommand : Command<AppSettings>
             }
 
             CslaCodeTool.CodeSamplesPath = fullPath;
+            Console.WriteLine($"[Startup] Using CodeSamplesPath from CLI: {fullPath}");
+        }
+
+        // Final logging of the resolved path
+        Console.WriteLine($"[Startup] Final CodeSamplesPath: {CslaCodeTool.CodeSamplesPath}");
+        Console.WriteLine($"[Startup] CodeSamplesPath exists: {Directory.Exists(CslaCodeTool.CodeSamplesPath)}");
+        
+        if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
+        {
+            var csFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
+            var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
+            Console.WriteLine($"[Startup] Found {csFiles.Length} .cs files and {mdFiles.Length} .md files");
         }
 
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddMcpServer()
             .WithHttpTransport()
             .WithTools<CslaCodeTool>();
+
+        // CSLA services (modern pattern using IDataPortal<T>)
+        builder.Services.AddCsla();
+
+        // Add health checks for k8s liveness/readiness
+        builder.Services.AddHealthChecks();
 
         builder.Services.AddOpenTelemetry()
             .WithTracing(b => b.AddSource("*")
@@ -93,7 +124,14 @@ public sealed class RunCommand : Command<AppSettings>
             .UseOtlpExporter();
 
         var app = builder.Build();
+
+        // Expose health endpoint at /health
+        app.MapHealthChecks("/health");
+
         app.MapMcp();
+        
+        Console.WriteLine($"[Startup] Server starting on: {builder.Configuration["ASPNETCORE_URLS"] ?? "default URLs"}");
+        
         app.Run();
 
         return 0;
