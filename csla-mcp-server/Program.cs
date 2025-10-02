@@ -2,6 +2,7 @@ using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using CslaMcpServer.Tools;
+using CslaMcpServer.Services;
 using Spectre.Console.Cli;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -101,6 +102,57 @@ public sealed class RunCommand : Command<AppSettings>
             var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
             Console.WriteLine($"[Startup] Found {csFiles.Length} .cs files and {mdFiles.Length} .md files");
         }
+
+        // Initialize vector store
+        Console.WriteLine("[Startup] Initializing vector store with Ollama...");
+        var vectorStore = new VectorStoreService();
+        CslaCodeTool.VectorStore = vectorStore;
+        
+        // Index all files asynchronously
+        var indexingTask = Task.Run(async () =>
+        {
+            try
+            {
+                if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
+                {
+                    var csFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
+                    var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
+                    var allFiles = csFiles.Concat(mdFiles).ToArray();
+                    
+                    Console.WriteLine($"[Startup] Starting to index {allFiles.Length} files...");
+                    
+                    var indexedCount = 0;
+                    foreach (var file in allFiles)
+                    {
+                        try
+                        {
+                            var content = File.ReadAllText(file);
+                            var fileName = Path.GetFileName(file);
+                            await vectorStore.IndexDocumentAsync(fileName, content);
+                            indexedCount++;
+                            
+                            if (indexedCount % 5 == 0)
+                            {
+                                Console.WriteLine($"[Startup] Indexed {indexedCount}/{allFiles.Length} files...");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[Startup] Failed to index file {file}: {ex.Message}");
+                        }
+                    }
+                    
+                    Console.WriteLine($"[Startup] Completed indexing {indexedCount} files");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Startup] Error during vector store indexing: {ex.Message}");
+            }
+        });
+        
+        // Don't wait for indexing to complete before starting the server
+        // The server will start immediately and semantic search will become available as indexing progresses
 
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddMcpServer()
