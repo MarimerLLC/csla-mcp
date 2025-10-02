@@ -1,6 +1,7 @@
 ﻿using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using CslaMcpServer.Services;
 
 namespace CslaMcpServer.Tools
 {
@@ -8,6 +9,7 @@ namespace CslaMcpServer.Tools
   public class CslaCodeTool
   {
   public static string CodeSamplesPath { get; set; } = @"../csla-examples";
+    public static VectorStoreService? VectorStore { get; set; }
 
     public class WordMatch
     {
@@ -22,13 +24,25 @@ namespace CslaMcpServer.Tools
       public List<WordMatch> MatchingWords { get; set; } = new List<WordMatch>();
     }
 
+    public class SemanticMatch
+    {
+      public string FileName { get; set; } = string.Empty;
+      public float SimilarityScore { get; set; }
+    }
+
+    public class CombinedSearchResult
+    {
+      public List<SemanticMatch> SemanticMatches { get; set; } = new List<SemanticMatch>();
+      public List<SearchResult> WordMatches { get; set; } = new List<SearchResult>();
+    }
+
     public class ErrorResult
     {
       public string Error { get; set; } = string.Empty;
       public string Message { get; set; } = string.Empty;
     }
 
-    [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON array of search results with scores, file names, and matching words with their counts, ordered by score. A larger score is a better match.")]
+    [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON object with two sections: SemanticMatches (vector-based semantic similarity) and WordMatches (traditional keyword matching). Both sections are ordered by their respective scores.")]
     public static string Search([Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message)
     {
       Console.WriteLine($"[CslaCodeTool.Search] Called with message: '{message}'");
@@ -113,9 +127,35 @@ namespace CslaMcpServer.Tools
         // Order by score descending, then by filename
         var sortedResults = results.OrderByDescending(r => r.Score).ThenBy(r => r.FileName).ToList();
         
-        Console.WriteLine($"[CslaCodeTool.Search] Returning {sortedResults.Count} results");
+        Console.WriteLine($"[CslaCodeTool.Search] Found {sortedResults.Count} word match results");
         
-        return JsonSerializer.Serialize(sortedResults, new JsonSerializerOptions { WriteIndented = true });
+        // Perform semantic search if vector store is available
+        var semanticMatches = new List<SemanticMatch>();
+        if (VectorStore != null && VectorStore.IsReady())
+        {
+          Console.WriteLine("[CslaCodeTool.Search] Performing semantic search");
+          var semanticResults = VectorStore.SearchAsync(message, topK: 10).GetAwaiter().GetResult();
+          semanticMatches = semanticResults.Select(r => new SemanticMatch
+          {
+            FileName = r.FileName,
+            SimilarityScore = r.SimilarityScore
+          }).ToList();
+          Console.WriteLine($"[CslaCodeTool.Search] Found {semanticMatches.Count} semantic matches");
+        }
+        else
+        {
+          Console.WriteLine("[CslaCodeTool.Search] Vector store not available, skipping semantic search");
+        }
+        
+        var combinedResult = new CombinedSearchResult
+        {
+          SemanticMatches = semanticMatches,
+          WordMatches = sortedResults
+        };
+        
+        Console.WriteLine($"[CslaCodeTool.Search] Returning combined results");
+        
+        return JsonSerializer.Serialize(combinedResult, new JsonSerializerOptions { WriteIndented = true });
       }
       catch (Exception ex)
       {
