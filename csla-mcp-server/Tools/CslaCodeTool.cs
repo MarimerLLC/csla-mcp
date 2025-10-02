@@ -11,17 +11,10 @@ namespace CslaMcpServer.Tools
   public static string CodeSamplesPath { get; set; } = @"../csla-examples";
     public static VectorStoreService? VectorStore { get; set; }
 
-    public class WordMatch
-    {
-      public string Word { get; set; } = string.Empty;
-      public int Count { get; set; }
-    }
-
     public class SearchResult
     {
       public int Score { get; set; }
       public string FileName { get; set; } = string.Empty;
-      public List<WordMatch> MatchingWords { get; set; } = new List<WordMatch>();
     }
 
     public class SemanticMatch
@@ -93,7 +86,6 @@ namespace CslaMcpServer.Tools
           try
           {
             var content = File.ReadAllText(file);
-            var matchingWords = new List<WordMatch>();
             var totalScore = 0;
             
             foreach (var word in searchWords)
@@ -101,7 +93,6 @@ namespace CslaMcpServer.Tools
               var count = CountWordOccurrences(content, word);
               if (count > 0)
               {
-                matchingWords.Add(new WordMatch { Word = word, Count = count });
                 totalScore += count;
               }
             }
@@ -112,8 +103,7 @@ namespace CslaMcpServer.Tools
               results.Add(new SearchResult
               {
                 Score = totalScore,
-                FileName = Path.GetFileName(file),
-                MatchingWords = matchingWords
+                FileName = Path.GetFileName(file)
               });
             }
           }

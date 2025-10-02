@@ -134,7 +134,7 @@ namespace CslaMcpServer.Services
         var topResults = results
           .OrderByDescending(r => r.SimilarityScore)
           .Take(topK)
-          .Where(r => r.SimilarityScore > 0.1f) // Filter out very low similarity scores
+          .Where(r => r.SimilarityScore > 0.5f) // Filter out low similarity scores
           .ToList();
 
         Console.WriteLine($"[VectorStore] Found {topResults.Count} semantic matches");
