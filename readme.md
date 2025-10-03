@@ -9,10 +9,56 @@ The CSLA MCP Server provides AI coding assistants with access to official CSLA .
 ## Features
 
 - **Code Examples**: Comprehensive collection of CSLA .NET code examples organized by concept and complexity
-- **Semantic Search**: Find relevant examples using natural language queries
+- **Semantic Search**: Find relevant examples using natural language queries powered by Azure OpenAI embeddings
 - **Concept Browsing**: Browse available CSLA concepts and categories
 - **Aspire Integration**: Built with .NET Aspire for modern cloud-native development
 - **HTTP API**: RESTful API endpoints for easy integration
+
+## Azure OpenAI Configuration
+
+The server uses Azure OpenAI for vector embeddings to provide semantic search capabilities. You must configure the following environment variables:
+
+### Required Environment Variables
+- `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI service endpoint (e.g., `https://your-resource.openai.azure.com/`)
+- `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
+
+### Optional Environment Variables
+- `AZURE_OPENAI_EMBEDDING_MODEL`: The embedding model deployment name to use (default: `text-embedding-3-small`)
+- `AZURE_OPENAI_API_VERSION`: The API version to use (default: `2024-02-01`)
+
+### ⚠️ Important: Model Deployment Required
+
+**Before running the server**, you must deploy an embedding model in your Azure OpenAI resource. The deployment name must exactly match the `AZURE_OPENAI_EMBEDDING_MODEL` environment variable.
+
+**Quick Setup**: See [azure-openai-setup-guide.md](azure-openai-setup-guide.md) for step-by-step instructions.
+
+To deploy a model:
+1. Go to [Azure OpenAI Studio](https://oai.azure.com/)
+2. Navigate to "Deployments"
+3. Create a new deployment with the model `text-embedding-3-small`
+4. Ensure the deployment name matches your environment variable
+
+**Fallback Mode**: If Azure OpenAI isn't configured, the server will run in keyword-only search mode.
+
+### Example Configuration
+
+**PowerShell (Windows):**
+```powershell
+$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+$env:AZURE_OPENAI_API_KEY = "your-api-key-here"
+$env:AZURE_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"  # Must match deployment name
+$env:AZURE_OPENAI_API_VERSION = "2024-02-01"  # Optional, API version
+```
+
+**Bash (Linux/macOS):**
+```bash
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key-here"
+export AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-3-small"  # Must match deployment name
+export AZURE_OPENAI_API_VERSION="2024-02-01"  # Optional, API version
+```
+
+For more detailed configuration information, see [azure-openai-config.md](azure-openai-config.md).
 
 ## MCP Tools
 
@@ -127,25 +173,36 @@ Below are PowerShell-friendly (Windows) commands to build and run the container 
 docker build -f csla-mcp-server/Dockerfile -t csla-mcp-server:latest .
 ```
 
-2) Run the container (maps container port 80 to host port 8080):
+2) Run the container with Azure OpenAI configuration (maps container port 80 to host port 8080):
 
 ```powershell
-docker run --rm -p 8080:80 --name csla-mcp-server csla-mcp-server:latest
+docker run --rm -p 8080:80 `
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
+  -e AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-3-small" `
+  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
+  --name csla-mcp-server csla-mcp-server:latest
 ```
 
 3) Open your browser to `http://localhost:8080` (or the mapped host port) to access the server. If the server uses a different default endpoint, consult the project `Program.cs` or the server logs printed to the container.
 
-Optional: Build with a different tag and pass an environment variable for ASP.NET Core URLs (already set in the Dockerfile):
+Optional: Build with a different tag and pass additional environment variables:
 
 ```powershell
 docker build -f csla-mcp-server/Dockerfile -t myregistry/csla-mcp-server:v1.0 .
-docker run --rm -p 8080:80 --name csla-mcp-server -e ASPNETCORE_ENVIRONMENT=Development myregistry/csla-mcp-server:v1.0
+docker run --rm -p 8080:80 `
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
+  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
+  -e ASPNETCORE_ENVIRONMENT=Development `
+  --name csla-mcp-server myregistry/csla-mcp-server:v1.0
 ```
 
 Notes:
 - The `Dockerfile` uses .NET 10 SDK and ASP.NET runtime images. Ensure your Docker installation supports the required base images.
 - The Docker build will run a `dotnet publish` inside the container; it may take a few minutes the first time as NuGet packages are restored.
 - If you need to debug or iterate quickly during development, consider running the app locally with `dotnet run --project csla-mcp-server/csla-mcp-server.csproj` instead of rebuilding the image for every change.
+- **Important**: The Azure OpenAI environment variables are required for the semantic search functionality to work.
 
 ### Docker: pass the code samples folder into the container
 
@@ -157,6 +214,9 @@ Example (Linux/macOS or Docker Desktop using Linux containers):
 docker run --rm -p 8080:80 \
   -v "/path/on/host/csla-examples:/app/examples" \
   -e CSLA_CODE_SAMPLES_PATH="/app/examples" \
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" \
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" \
+  -e AZURE_OPENAI_API_VERSION="2024-02-01" \
   --name csla-mcp-server csla-mcp-server:latest
 ```
 
@@ -166,6 +226,9 @@ Example (PowerShell on Windows):
 docker run --rm -p 8080:80 `
   -v "S:\src\rdl\csla-mcp\csla-examples:/app/examples" `
   -e CSLA_CODE_SAMPLES_PATH="/app/examples" `
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
+  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
   --name csla-mcp-server csla-mcp-server:latest
 ```
 

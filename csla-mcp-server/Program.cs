@@ -103,9 +103,43 @@ public sealed class RunCommand : Command<AppSettings>
             Console.WriteLine($"[Startup] Found {csFiles.Length} .cs files and {mdFiles.Length} .md files");
         }
 
-        // Initialize vector store
-        Console.WriteLine("[Startup] Initializing vector store with Ollama...");
-        var vectorStore = new VectorStoreService();
+        // Initialize vector store with Azure OpenAI
+        Console.WriteLine("[Startup] Initializing vector store with Azure OpenAI...");
+        
+        var azureOpenAIEndpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+        var azureOpenAIApiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+        var embeddingModel = Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_MODEL") ?? "text-embedding-3-small";
+        var apiVersion = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_VERSION") ?? "2024-02-01";
+        
+        VectorStoreService? vectorStore = null;
+        
+        if (string.IsNullOrWhiteSpace(azureOpenAIEndpoint) || string.IsNullOrWhiteSpace(azureOpenAIApiKey))
+        {
+            Console.WriteLine("[Startup] Azure OpenAI configuration not found - running in keyword-only search mode.");
+            Console.WriteLine("[Startup] To enable semantic search, set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY environment variables.");
+            Console.WriteLine("[Startup] See azure-openAI-config.md for detailed setup instructions.");
+        }
+        else
+        {
+            Console.WriteLine($"[Startup] Using Azure OpenAI endpoint: {azureOpenAIEndpoint}");
+            Console.WriteLine($"[Startup] Using embedding model deployment: {embeddingModel}");
+            Console.WriteLine($"[Startup] Using API version: {apiVersion}");
+            Console.WriteLine($"[Startup] IMPORTANT: Ensure you have deployed the '{embeddingModel}' model in your Azure OpenAI resource.");
+            Console.WriteLine($"[Startup] The deployment name in Azure must exactly match the model name: {embeddingModel}");
+            
+            try
+            {
+                vectorStore = new VectorStoreService(azureOpenAIEndpoint, azureOpenAIApiKey, embeddingModel, apiVersion);
+                Console.WriteLine("[Startup] Vector store initialized successfully - semantic search enabled.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Startup] Failed to initialize vector store: {ex.Message}");
+                Console.WriteLine("[Startup] Continuing in keyword-only search mode.");
+                Console.WriteLine("[Startup] Check your Azure OpenAI configuration and deployment setup.");
+            }
+        }
+        
         CslaCodeTool.VectorStore = vectorStore;
         
         // Index all files asynchronously
@@ -115,39 +149,57 @@ public sealed class RunCommand : Command<AppSettings>
             {
                 if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
                 {
+                    // Test connectivity first if vector store is available
+                    bool canIndex = vectorStore == null || await vectorStore.TestConnectivityAsync();
+                    
+                    if (!canIndex)
+                    {
+                        Console.WriteLine("[Startup] Skipping vector indexing due to Azure OpenAI connectivity issues.");
+                        Console.WriteLine("[Startup] Server will run with keyword search only.");
+                        return;
+                    }
+
                     var csFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
                     var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
                     var allFiles = csFiles.Concat(mdFiles).ToArray();
                     
-                    Console.WriteLine($"[Startup] Starting to index {allFiles.Length} files...");
-                    
-                    var indexedCount = 0;
-                    foreach (var file in allFiles)
+                    if (vectorStore != null)
                     {
-                        try
+                        Console.WriteLine($"[Startup] Starting to index {allFiles.Length} files for semantic search...");
+                        
+                        var indexedCount = 0;
+                        foreach (var file in allFiles)
                         {
-                            var content = File.ReadAllText(file);
-                            var fileName = Path.GetFileName(file);
-                            await vectorStore.IndexDocumentAsync(fileName, content);
-                            indexedCount++;
-                            
-                            if (indexedCount % 5 == 0)
+                            try
                             {
-                                Console.WriteLine($"[Startup] Indexed {indexedCount}/{allFiles.Length} files...");
+                                var content = File.ReadAllText(file);
+                                var fileName = Path.GetFileName(file);
+                                await vectorStore.IndexDocumentAsync(fileName, content);
+                                indexedCount++;
+                                
+                                if (indexedCount % 5 == 0)
+                                {
+                                    Console.WriteLine($"[Startup] Indexed {indexedCount}/{allFiles.Length} files...");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[Startup] Failed to index file {file}: {ex.Message}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[Startup] Failed to index file {file}: {ex.Message}");
-                        }
+                        
+                        Console.WriteLine($"[Startup] Completed indexing {indexedCount} files");
                     }
-                    
-                    Console.WriteLine($"[Startup] Completed indexing {indexedCount} files");
+                    else
+                    {
+                        Console.WriteLine("[Startup] Vector store not available - skipping semantic indexing.");
+                        Console.WriteLine($"[Startup] Found {allFiles.Length} files available for keyword search.");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Startup] Error during vector store indexing: {ex.Message}");
+                Console.WriteLine($"[Startup] Error during file indexing: {ex.Message}");
             }
         });
         

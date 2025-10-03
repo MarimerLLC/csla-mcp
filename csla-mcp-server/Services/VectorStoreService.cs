@@ -1,15 +1,18 @@
 using System.Numerics.Tensors;
 using System.Text;
 using System.Text.Json;
+using Azure.AI.OpenAI;
+using Azure;
+using OpenAI.Embeddings;
 
 namespace CslaMcpServer.Services
 {
   public class VectorStoreService
   {
-    private readonly HttpClient _httpClient;
+    private readonly AzureOpenAIClient _openAIClient;
     private readonly Dictionary<string, DocumentEmbedding> _vectorStore;
-    private readonly string _ollamaEndpoint;
-    private readonly string _modelName;
+    private readonly string _embeddingModelName;
+    private bool _isHealthy = true;
 
     public class DocumentEmbedding
     {
@@ -24,52 +27,114 @@ namespace CslaMcpServer.Services
       public float SimilarityScore { get; set; }
     }
 
-    public VectorStoreService(string ollamaEndpoint = "http://localhost:11434", string modelName = "nomic-embed-text:latest")
+    public VectorStoreService(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-small", string apiVersion = "2024-02-01")
     {
-      _httpClient = new HttpClient();
+      // Use the latest available service version as default
+      var clientOptions = new AzureOpenAIClientOptions();
+      
+      _openAIClient = new AzureOpenAIClient(new Uri(azureOpenAIEndpoint), new AzureKeyCredential(azureOpenAIApiKey), clientOptions);
       _vectorStore = new Dictionary<string, DocumentEmbedding>();
-      _ollamaEndpoint = ollamaEndpoint;
-      _modelName = modelName;
+      _embeddingModelName = embeddingModelName;
+      
+      Console.WriteLine($"[VectorStore] Initialized with API version: {apiVersion} (using default client options)");
+    }
+
+    public async Task<bool> TestConnectivityAsync()
+    {
+      try
+      {
+        Console.WriteLine("[VectorStore] Testing Azure OpenAI connectivity...");
+        var testEmbedding = await GenerateEmbeddingAsync("test connection");
+        _isHealthy = testEmbedding != null && testEmbedding.Length > 0;
+        
+        if (_isHealthy)
+        {
+          Console.WriteLine("[VectorStore] Connectivity test passed - semantic search available.");
+        }
+        else
+        {
+          Console.WriteLine("[VectorStore] Connectivity test failed - semantic search disabled.");
+        }
+        
+        return _isHealthy;
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"[VectorStore] Connectivity test failed: {ex.Message}");
+        _isHealthy = false;
+        return false;
+      }
     }
 
     public async Task<float[]?> GenerateEmbeddingAsync(string text)
     {
+      if (!_isHealthy)
+      {
+        return null;
+      }
+
       try
       {
-        var request = new
-        {
-          model = _modelName,
-          prompt = text
-        };
-
-        var json = JsonSerializer.Serialize(request);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await _httpClient.PostAsync($"{_ollamaEndpoint}/api/embeddings", content);
+        Console.WriteLine($"[VectorStore] Attempting to generate embedding using model: {_embeddingModelName}");
         
-        if (!response.IsSuccessStatusCode)
-        {
-          Console.WriteLine($"[VectorStore] Failed to generate embedding. Status: {response.StatusCode}");
-          return null;
-        }
-
-        var responseJson = await response.Content.ReadAsStringAsync();
-        var result = JsonSerializer.Deserialize<JsonElement>(responseJson);
+        var embeddingClient = _openAIClient.GetEmbeddingClient(_embeddingModelName);
+        var response = await embeddingClient.GenerateEmbeddingAsync(text);
         
-        if (result.TryGetProperty("embedding", out var embeddingElement))
+        if (response?.Value != null)
         {
-          var embedding = embeddingElement.EnumerateArray()
-            .Select(e => (float)e.GetDouble())
-            .ToArray();
-          
+          var embedding = response.Value.ToFloats().ToArray();
+          Console.WriteLine($"[VectorStore] Successfully generated embedding with {embedding.Length} dimensions");
           return embedding;
         }
 
+        Console.WriteLine("[VectorStore] Response was null or empty");
+        return null;
+      }
+      catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+      {
+        Console.WriteLine($"[VectorStore] Error: Azure OpenAI deployment '{_embeddingModelName}' not found (404).");
+        Console.WriteLine($"[VectorStore] Please ensure you have deployed the embedding model '{_embeddingModelName}' in your Azure OpenAI resource.");
+        Console.WriteLine($"[VectorStore] Available deployment names in Azure should match the AZURE_OPENAI_EMBEDDING_MODEL environment variable.");
+        Console.WriteLine($"[VectorStore] Also check that your model is compatible with the current API version.");
+        Console.WriteLine("[VectorStore] Disabling semantic search for this session.");
+        _isHealthy = false;
+        return null;
+      }
+      catch (Azure.RequestFailedException ex) when (ex.Status == 400)
+      {
+        Console.WriteLine($"[VectorStore] Bad Request (400): {ex.Message}");
+        Console.WriteLine("[VectorStore] This might be an API version compatibility issue.");
+        Console.WriteLine("[VectorStore] For text-embedding-3-small: Ensure you're using a recent API version");
+        Console.WriteLine("[VectorStore] For text-embedding-ada-002: Try setting AZURE_OPENAI_API_VERSION to a compatible version");
+        Console.WriteLine("[VectorStore] Disabling semantic search for this session.");
+        _isHealthy = false;
+        return null;
+      }
+      catch (Azure.RequestFailedException ex)
+      {
+        Console.WriteLine($"[VectorStore] Azure OpenAI API error (Status: {ex.Status}): {ex.Message}");
+        if (ex.Status == 401)
+        {
+          Console.WriteLine("[VectorStore] This might be an authentication issue. Please check your AZURE_OPENAI_API_KEY.");
+        }
+        else if (ex.Status == 403)
+        {
+          Console.WriteLine("[VectorStore] This might be a permissions issue. Please check your Azure OpenAI resource access.");
+        }
+        Console.WriteLine("[VectorStore] Disabling semantic search for this session.");
+        _isHealthy = false;
         return null;
       }
       catch (Exception ex)
       {
-        Console.WriteLine($"[VectorStore] Error generating embedding: {ex.Message}");
+        Console.WriteLine($"[VectorStore] Unexpected error generating embedding: {ex.Message}");
+        Console.WriteLine($"[VectorStore] Exception type: {ex.GetType().Name}");
+        if (ex.InnerException != null)
+        {
+          Console.WriteLine($"[VectorStore] Inner exception: {ex.InnerException.Message}");
+        }
+        Console.WriteLine("[VectorStore] Disabling semantic search for this session.");
+        _isHealthy = false;
         return null;
       }
     }
@@ -174,7 +239,12 @@ namespace CslaMcpServer.Services
 
     public bool IsReady()
     {
-      return _vectorStore.Count > 0;
+      return _isHealthy && _vectorStore.Count > 0;
+    }
+
+    public bool IsHealthy()
+    {
+      return _isHealthy;
     }
   }
 }

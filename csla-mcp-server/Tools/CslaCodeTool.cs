@@ -79,68 +79,20 @@ namespace CslaMcpServer.Tools
           return JsonSerializer.Serialize(new List<SearchResult>());
         }
 
-        var results = new List<SearchResult>();
-        
-        foreach (var file in allFiles)
-        {
-          try
-          {
-            var content = File.ReadAllText(file);
-            var totalScore = 0;
-            
-            foreach (var word in searchWords)
-            {
-              var count = CountWordOccurrences(content, word);
-              if (count > 0)
-              {
-                totalScore += count;
-              }
-            }
-            
-            if (totalScore > 0)
-            {
-              Console.WriteLine($"[CslaCodeTool.Search] Found matches in '{Path.GetFileName(file)}' with score {totalScore}");
-              results.Add(new SearchResult
-              {
-                Score = totalScore,
-                FileName = Path.GetFileName(file)
-              });
-            }
-          }
-          catch (Exception ex)
-          {
-            Console.WriteLine($"[CslaCodeTool.Search] Error reading file {file}: {ex.Message}");
-            // Continue processing other files
-          }
-        }
-        
-        // Order by score descending, then by filename
-        var sortedResults = results.OrderByDescending(r => r.Score).ThenBy(r => r.FileName).ToList();
-        
-        Console.WriteLine($"[CslaCodeTool.Search] Found {sortedResults.Count} word match results");
-        
-        // Perform semantic search if vector store is available
-        var semanticMatches = new List<SemanticMatch>();
-        if (VectorStore != null && VectorStore.IsReady())
-        {
-          Console.WriteLine("[CslaCodeTool.Search] Performing semantic search");
-          var semanticResults = VectorStore.SearchAsync(message, topK: 10).GetAwaiter().GetResult();
-          semanticMatches = semanticResults.Select(r => new SemanticMatch
-          {
-            FileName = r.FileName,
-            SimilarityScore = r.SimilarityScore
-          }).ToList();
-          Console.WriteLine($"[CslaCodeTool.Search] Found {semanticMatches.Count} semantic matches");
-        }
-        else
-        {
-          Console.WriteLine("[CslaCodeTool.Search] Vector store not available, skipping semantic search");
-        }
+        // Create tasks for parallel execution
+        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchWords));
+        var semanticSearchTask = Task.Run(() => PerformSemanticSearch(message));
+
+        // Wait for both tasks to complete
+        Task.WaitAll(wordSearchTask, semanticSearchTask);
+
+        var wordMatches = wordSearchTask.Result;
+        var semanticMatches = semanticSearchTask.Result;
         
         var combinedResult = new CombinedSearchResult
         {
           SemanticMatches = semanticMatches,
-          WordMatches = sortedResults
+          WordMatches = wordMatches
         };
         
         Console.WriteLine($"[CslaCodeTool.Search] Returning combined results");
@@ -157,6 +109,79 @@ namespace CslaMcpServer.Tools
           Message = error 
         }, new JsonSerializerOptions { WriteIndented = true });
       }
+    }
+
+    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchWords)
+    {
+      Console.WriteLine("[CslaCodeTool.PerformWordSearch] Starting word search");
+      var results = new List<SearchResult>();
+      
+      foreach (var file in allFiles)
+      {
+        try
+        {
+          var content = File.ReadAllText(file);
+          var totalScore = 0;
+          
+          foreach (var word in searchWords)
+          {
+            var count = CountWordOccurrences(content, word);
+            if (count > 0)
+            {
+              totalScore += count;
+            }
+          }
+          
+          if (totalScore > 0)
+          {
+            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{Path.GetFileName(file)}' with score {totalScore}");
+            results.Add(new SearchResult
+            {
+              Score = totalScore,
+              FileName = Path.GetFileName(file)
+            });
+          }
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Error reading file {file}: {ex.Message}");
+          // Continue processing other files
+        }
+      }
+      
+      // Order by score descending, then by filename
+      var sortedResults = results.OrderByDescending(r => r.Score).ThenBy(r => r.FileName).ToList();
+      
+      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {sortedResults.Count} word match results");
+      return sortedResults;
+    }
+
+    private static List<SemanticMatch> PerformSemanticSearch(string message)
+    {
+      Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Starting semantic search");
+      var semanticMatches = new List<SemanticMatch>();
+      
+      if (VectorStore != null && VectorStore.IsReady())
+      {
+        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Performing semantic search");
+        var semanticResults = VectorStore.SearchAsync(message, topK: 10).GetAwaiter().GetResult();
+        semanticMatches = semanticResults.Select(r => new SemanticMatch
+        {
+          FileName = r.FileName,
+          SimilarityScore = r.SimilarityScore
+        }).ToList();
+        Console.WriteLine($"[CslaCodeTool.PerformSemanticSearch] Found {semanticMatches.Count} semantic matches");
+      }
+      else if (VectorStore != null && !VectorStore.IsHealthy())
+      {
+        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Semantic search unavailable due to Azure OpenAI configuration issues");
+      }
+      else
+      {
+        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Vector store not available, using keyword search only");
+      }
+      
+      return semanticMatches;
     }
 
     private static int CountWordOccurrences(string content, string word)
