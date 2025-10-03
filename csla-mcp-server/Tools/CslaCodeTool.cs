@@ -1,6 +1,7 @@
 ﻿using ModelContextProtocol.Server;
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CslaMcpServer.Services;
 
 namespace CslaMcpServer.Tools
@@ -64,25 +65,45 @@ namespace CslaMcpServer.Tools
         
         Console.WriteLine($"[CslaCodeTool.Search] Found {csFiles.Length} .cs files and {mdFiles.Length} .md files");
         
-        // Extract words longer than 4 characters from the message
-        var searchWords = message
+        // Extract words from the message, preserving order for multi-word combinations
+        var allWords = message
           .Split(new char[] { ' ', '\t', '\n', '\r', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '"', '\'', '-', '_' }, 
                  StringSplitOptions.RemoveEmptyEntries)
           .Where(word => word.Length > 3)
           .Select(word => word.ToLowerInvariant())
-          .Distinct()
           .ToList();
 
-        Console.WriteLine($"[CslaCodeTool.Search] Extracted search words: [{string.Join(", ", searchWords)}]");
-
-        if (!searchWords.Any())
+        // Create single words (remove duplicates)
+        var singleWords = allWords.Distinct().ToList();
+        
+        // Create 2-word combinations from adjacent words
+        var twoWordPhrases = new List<string>();
+        for (int i = 0; i < allWords.Count - 1; i++)
         {
-          Console.WriteLine("[CslaCodeTool.Search] No search words found, returning empty results");
+          var phrase = $"{allWords[i]} {allWords[i + 1]}";
+          if (!twoWordPhrases.Contains(phrase))
+          {
+            twoWordPhrases.Add(phrase);
+          }
+        }
+
+        // Combine single words and 2-word phrases
+        var searchTerms = new List<string>();
+        searchTerms.AddRange(singleWords);
+        searchTerms.AddRange(twoWordPhrases);
+
+        Console.WriteLine($"[CslaCodeTool.Search] Extracted single words: [{string.Join(", ", singleWords)}]");
+        Console.WriteLine($"[CslaCodeTool.Search] Extracted 2-word phrases: [{string.Join(", ", twoWordPhrases)}]");
+        Console.WriteLine($"[CslaCodeTool.Search] Total search terms: {searchTerms.Count}");
+
+        if (!searchTerms.Any())
+        {
+          Console.WriteLine("[CslaCodeTool.Search] No search terms found, returning empty results");
           return JsonSerializer.Serialize(new List<ConsolidatedSearchResult>());
         }
 
         // Create tasks for parallel execution
-        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchWords));
+        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchTerms));
         var semanticSearchTask = Task.Run(() => PerformSemanticSearch(message));
 
         // Wait for both tasks to complete
@@ -169,7 +190,7 @@ namespace CslaMcpServer.Tools
       return sortedResults;
     }
 
-    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchWords)
+    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms)
     {
       Console.WriteLine("[CslaCodeTool.PerformWordSearch] Starting word search");
       var results = new List<SearchResult>();
@@ -181,18 +202,21 @@ namespace CslaMcpServer.Tools
           var content = File.ReadAllText(file);
           var totalScore = 0;
           
-          foreach (var word in searchWords)
+          foreach (var term in searchTerms)
           {
-            var count = CountWordOccurrences(content, word);
+            var count = CountWordOccurrences(content, term);
             if (count > 0)
             {
-              totalScore += count;
+              // Give higher weight to multi-word phrases
+              var weight = term.Contains(' ') ? 2 : 1;
+              totalScore += count * weight;
+              Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {count} matches for '{term}' in '{Path.GetFileName(file)}' (weight: {weight})");
             }
           }
           
           if (totalScore > 0)
           {
-            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{Path.GetFileName(file)}' with score {totalScore}");
+            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{Path.GetFileName(file)}' with total score {totalScore}");
             results.Add(new SearchResult
             {
               Score = totalScore,
@@ -273,18 +297,24 @@ namespace CslaMcpServer.Tools
       return semanticMatches;
     }
 
-    private static int CountWordOccurrences(string content, string word)
+    private static int CountWordOccurrences(string content, string searchTerm)
     {
-      int count = 0;
-      int index = 0;
-      
-      while ((index = content.IndexOf(word, index, StringComparison.OrdinalIgnoreCase)) != -1)
+      // Handle multi-word phrases
+      if (searchTerm.Contains(' '))
       {
-        count++;
-        index += word.Length;
+        // For phrases, we need to ensure word boundaries at the beginning and end
+        var escapedTerm = Regex.Escape(searchTerm);
+        var pattern = $@"\b{escapedTerm}\b";
+        var matches = Regex.Matches(content, pattern, RegexOptions.IgnoreCase);
+        return matches.Count;
       }
-      
-      return count;
+      else
+      {
+        // For single words, use word boundaries to ensure we only match complete words
+        var pattern = $@"\b{Regex.Escape(searchTerm)}\b";
+        var matches = Regex.Matches(content, pattern, RegexOptions.IgnoreCase);
+        return matches.Count;
+      }
     }
 
     [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet.")]
