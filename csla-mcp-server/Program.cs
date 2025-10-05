@@ -173,8 +173,22 @@ public sealed class RunCommand : Command<AppSettings>
                             try
                             {
                                 var content = File.ReadAllText(file);
-                                var fileName = Path.GetFileName(file);
-                                await vectorStore.IndexDocumentAsync(fileName, content);
+                                
+                                // Get relative path from CodeSamplesPath
+                                var relativePath = Path.GetRelativePath(CslaCodeTool.CodeSamplesPath, file);
+                                
+                                // Detect version from path
+                                int? version = null;
+                                var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
+                                if (pathParts.Length > 1 && pathParts[0].StartsWith("v") && int.TryParse(pathParts[0].Substring(1), out var versionNumber))
+                                {
+                                    version = versionNumber;
+                                }
+                                
+                                // Normalize path separators to forward slash for consistency
+                                var normalizedPath = relativePath.Replace("\\", "/");
+                                
+                                await vectorStore.IndexDocumentAsync(normalizedPath, content, version);
                                 indexedCount++;
                                 
                                 if (indexedCount % 5 == 0)
