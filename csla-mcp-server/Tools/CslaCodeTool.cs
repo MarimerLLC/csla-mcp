@@ -39,9 +39,11 @@ namespace CslaMcpServer.Tools
     }
 
     [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON array of consolidated search results that merge semantic and word search scores.")]
-    public static string Search([Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message)
+    public static string Search(
+      [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message,
+      [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
     {
-      Console.WriteLine($"[CslaCodeTool.Search] Called with message: '{message}'");
+      Console.WriteLine($"[CslaCodeTool.Search] Called with message: '{message}', version: {version?.ToString() ?? "not specified (will use highest)"}");
       
       try
       {
@@ -57,6 +59,13 @@ namespace CslaMcpServer.Tools
             Error = "PathNotFound", 
             Message = error 
           }, new JsonSerializerOptions { WriteIndented = true });
+        }
+
+        // If version not specified, detect highest version from subdirectories
+        if (!version.HasValue)
+        {
+          version = GetHighestVersionFromFileSystem();
+          Console.WriteLine($"[CslaCodeTool.Search] Version not specified, defaulting to highest: v{version}");
         }
 
         var csFiles = Directory.GetFiles(CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
@@ -103,8 +112,8 @@ namespace CslaMcpServer.Tools
         }
 
         // Create tasks for parallel execution
-        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchTerms));
-        var semanticSearchTask = Task.Run(() => PerformSemanticSearch(message));
+        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchTerms, version.Value));
+        var semanticSearchTask = Task.Run(() => PerformSemanticSearch(message, version));
 
         // Wait for both tasks to complete
         Task.WaitAll(wordSearchTask, semanticSearchTask);
@@ -190,15 +199,27 @@ namespace CslaMcpServer.Tools
       return sortedResults;
     }
 
-    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms)
+    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms, int version)
     {
-      Console.WriteLine("[CslaCodeTool.PerformWordSearch] Starting word search");
+      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Starting word search for version {version}");
       var results = new List<SearchResult>();
       
       foreach (var file in allFiles)
       {
         try
         {
+          // Get relative path from CodeSamplesPath
+          var relativePath = Path.GetRelativePath(CodeSamplesPath, file);
+          
+          // Filter by version: include if in top directory (common) or in matching version subdirectory
+          var isCommon = !relativePath.Contains(Path.DirectorySeparatorChar);
+          var isMatchingVersion = relativePath.StartsWith($"v{version}{Path.DirectorySeparatorChar}");
+          
+          if (!isCommon && !isMatchingVersion)
+          {
+            continue; // Skip files from other version directories
+          }
+          
           var content = File.ReadAllText(file);
           var totalScore = 0;
           
@@ -210,17 +231,17 @@ namespace CslaMcpServer.Tools
               // Give higher weight to multi-word phrases
               var weight = term.Contains(' ') ? 2 : 1;
               totalScore += count * weight;
-              Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {count} matches for '{term}' in '{Path.GetFileName(file)}' (weight: {weight})");
+              Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {count} matches for '{term}' in '{relativePath}' (weight: {weight})");
             }
           }
           
           if (totalScore > 0)
           {
-            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{Path.GetFileName(file)}' with total score {totalScore}");
+            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{relativePath}' with total score {totalScore}");
             results.Add(new SearchResult
             {
               Score = totalScore,
-              FileName = Path.GetFileName(file)
+              FileName = relativePath.Replace("\\", "/") // Normalize path separators
             });
           }
         }
@@ -269,15 +290,15 @@ namespace CslaMcpServer.Tools
       return normalizedResults;
     }
 
-    private static List<SemanticMatch> PerformSemanticSearch(string message)
+    private static List<SemanticMatch> PerformSemanticSearch(string message, int? version)
     {
-      Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Starting semantic search");
+      Console.WriteLine($"[CslaCodeTool.PerformSemanticSearch] Starting semantic search for version {version}");
       var semanticMatches = new List<SemanticMatch>();
       
       if (VectorStore != null && VectorStore.IsReady())
       {
         Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Performing semantic search");
-        var semanticResults = VectorStore.SearchAsync(message, topK: 10).GetAwaiter().GetResult();
+        var semanticResults = VectorStore.SearchAsync(message, version, topK: 10).GetAwaiter().GetResult();
         semanticMatches = semanticResults.Select(r => new SemanticMatch
         {
           FileName = r.FileName,
@@ -295,6 +316,34 @@ namespace CslaMcpServer.Tools
       }
       
       return semanticMatches;
+    }
+
+    private static int GetHighestVersionFromFileSystem()
+    {
+      try
+      {
+        var versionDirs = Directory.GetDirectories(CodeSamplesPath, "v*")
+          .Select(dir => Path.GetFileName(dir))
+          .Where(name => name.StartsWith("v") && int.TryParse(name.Substring(1), out _))
+          .Select(name => int.Parse(name.Substring(1)))
+          .ToList();
+        
+        if (versionDirs.Any())
+        {
+          var highest = versionDirs.Max();
+          Console.WriteLine($"[CslaCodeTool.GetHighestVersionFromFileSystem] Found versions: [{string.Join(", ", versionDirs.OrderBy(v => v))}], highest: {highest}");
+          return highest;
+        }
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"[CslaCodeTool.GetHighestVersionFromFileSystem] Error detecting versions: {ex.Message}");
+      }
+      
+      // No version directories found - return a reasonable default
+      // This will be used when all content is in the root directory (common to all versions)
+      Console.WriteLine("[CslaCodeTool.GetHighestVersionFromFileSystem] No version directories found, defaulting to latest known CSLA version");
+      return 10; // Default fallback when no version subdirectories exist
     }
 
     private static int CountWordOccurrences(string content, string searchTerm)
@@ -362,7 +411,9 @@ namespace CslaMcpServer.Tools
           }, new JsonSerializerOptions { WriteIndented = true });
         }
 
-        var filePath = Path.Combine(CodeSamplesPath, fileName);
+        // Normalize path separator to system default
+        var normalizedFileName = fileName.Replace("/", Path.DirectorySeparatorChar.ToString());
+        var filePath = Path.Combine(CodeSamplesPath, normalizedFileName);
         Console.WriteLine($"[CslaCodeTool.Fetch] Attempting to read file: '{filePath}'");
         
         if (File.Exists(filePath))

@@ -19,6 +19,7 @@ namespace CslaMcpServer.Services
       public string FileName { get; set; } = string.Empty;
       public string Content { get; set; } = string.Empty;
       public float[] Embedding { get; set; } = Array.Empty<float>();
+      public int? Version { get; set; } = null; // null means common to all versions
     }
 
     public class SemanticSearchResult
@@ -139,11 +140,12 @@ namespace CslaMcpServer.Services
       }
     }
 
-    public async Task IndexDocumentAsync(string fileName, string content)
+    public async Task IndexDocumentAsync(string fileName, string content, int? version = null)
     {
       try
       {
-        Console.WriteLine($"[VectorStore] Indexing document: {fileName}");
+        var versionInfo = version.HasValue ? $" (v{version})" : " (common)";
+        Console.WriteLine($"[VectorStore] Indexing document: {fileName}{versionInfo}");
         
         var embedding = await GenerateEmbeddingAsync(content);
         
@@ -153,10 +155,11 @@ namespace CslaMcpServer.Services
           {
             FileName = fileName,
             Content = content,
-            Embedding = embedding
+            Embedding = embedding,
+            Version = version
           };
           
-          Console.WriteLine($"[VectorStore] Successfully indexed {fileName} with {embedding.Length} dimensions");
+          Console.WriteLine($"[VectorStore] Successfully indexed {fileName}{versionInfo} with {embedding.Length} dimensions");
         }
         else
         {
@@ -169,11 +172,17 @@ namespace CslaMcpServer.Services
       }
     }
 
-    public async Task<List<SemanticSearchResult>> SearchAsync(string query, int topK = 10)
+    public async Task<List<SemanticSearchResult>> SearchAsync(string query, int? version = null, int topK = 10)
     {
       try
       {
-        Console.WriteLine($"[VectorStore] Performing semantic search for: {query}");
+        // If no version specified, default to highest version
+        if (!version.HasValue)
+        {
+          version = GetHighestVersion();
+        }
+        
+        Console.WriteLine($"[VectorStore] Performing semantic search for: {query} (version: {version})");
         
         var queryEmbedding = await GenerateEmbeddingAsync(query);
         
@@ -185,14 +194,18 @@ namespace CslaMcpServer.Services
 
         var results = new List<SemanticSearchResult>();
 
+        // Filter documents: include common (Version == null) and version-specific (Version == version)
         foreach (var doc in _vectorStore.Values)
         {
-          var similarity = CosineSimilarity(queryEmbedding, doc.Embedding);
-          results.Add(new SemanticSearchResult
+          if (doc.Version == null || doc.Version == version)
           {
-            FileName = doc.FileName,
-            SimilarityScore = similarity
-          });
+            var similarity = CosineSimilarity(queryEmbedding, doc.Embedding);
+            results.Add(new SemanticSearchResult
+            {
+              FileName = doc.FileName,
+              SimilarityScore = similarity
+            });
+          }
         }
 
         // Sort by similarity score descending and take top K
@@ -202,7 +215,7 @@ namespace CslaMcpServer.Services
           .Where(r => r.SimilarityScore > 0.5f) // Filter out low similarity scores
           .ToList();
 
-        Console.WriteLine($"[VectorStore] Found {topResults.Count} semantic matches");
+        Console.WriteLine($"[VectorStore] Found {topResults.Count} semantic matches for version {version}");
         
         return topResults;
       }
@@ -211,6 +224,27 @@ namespace CslaMcpServer.Services
         Console.WriteLine($"[VectorStore] Error during semantic search: {ex.Message}");
         return new List<SemanticSearchResult>();
       }
+    }
+
+    private int GetHighestVersion()
+    {
+      var versions = _vectorStore.Values
+        .Where(doc => doc.Version.HasValue)
+        .Select(doc => doc.Version!.Value)
+        .Distinct()
+        .ToList();
+      
+      if (versions.Any())
+      {
+        var highest = versions.Max();
+        Console.WriteLine($"[VectorStore] Highest version detected: {highest}");
+        return highest;
+      }
+      
+      // No version-specific content indexed - return a reasonable default
+      // This will be used when all content is common (version = null)
+      Console.WriteLine("[VectorStore] No version-specific content found, defaulting to latest known CSLA version");
+      return 10; // Default fallback when no version-specific documents exist
     }
 
     private float CosineSimilarity(float[] vector1, float[] vector2)
