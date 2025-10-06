@@ -60,6 +60,37 @@ export AZURE_OPENAI_API_VERSION="2024-02-01"  # Optional, API version
 
 For more detailed configuration information, see [azure-openai-config.md](azure-openai-config.md).
 
+## Vector Embeddings
+
+The server uses pre-generated vector embeddings for semantic search functionality. This significantly reduces startup time and Azure OpenAI API costs.
+
+### How It Works
+
+1. **Build Time**: When building the Docker container, the `build.sh` script runs the `csla-embeddings-generator` CLI tool to generate embeddings for all code samples
+2. **Container Build**: The generated `embeddings.json` file is copied into the Docker container
+3. **Runtime**: When the server starts, it loads the pre-generated embeddings from `embeddings.json` instead of regenerating them
+4. **User Queries**: The server still needs Azure OpenAI credentials at runtime to generate embeddings for user search queries
+
+### Generating Embeddings Manually
+
+You can manually generate embeddings using the CLI tool:
+
+```bash
+# Generate embeddings for the default csla-examples directory
+dotnet run --project csla-embeddings-generator
+
+# Or specify custom paths
+dotnet run --project csla-embeddings-generator -- --examples-path ./csla-examples --output ./embeddings.json
+```
+
+See [csla-embeddings-generator/README.md](csla-embeddings-generator/README.md) for more details.
+
+### Benefits
+
+- **Faster Startup**: Server starts immediately without waiting for embedding generation
+- **Reduced Costs**: Embeddings are only generated once during build time, not on every server restart
+- **Offline Development**: Container includes pre-generated embeddings, reducing dependency on Azure OpenAI during startup
+
 ## MCP Tools
 
 The server currently exposes two MCP tools implemented in `CslaMcpServer.Tools.CslaCodeTool`:
@@ -188,11 +219,24 @@ For questions about CSLA .NET, visit:
 
 This project includes a multi-stage `Dockerfile` for the `csla-mcp-server` located at `csla-mcp-server/Dockerfile` that builds and publishes the app, then produces a small runtime image.
 
-Below are PowerShell-friendly (Windows) commands to build and run the container locally. Run these from the repository root (`s:\src\rdl\csla-mcp`) or adjust paths if running from elsewhere.
+**Note**: Use the `build.sh` script to build the Docker image, as it first generates the vector embeddings and then builds the container with the embeddings included.
 
-1) Build the Docker image (tags the image as `csla-mcp-server:latest`):
+Below are commands to build and run the container locally. Run these from the repository root or adjust paths if running from elsewhere.
 
-```powershell
+1) Build the Docker image using the build script (recommended):
+
+```bash
+./build.sh
+```
+
+This script will:
+- Build the embeddings generator CLI tool
+- Generate embeddings for all code samples
+- Build the Docker image with embeddings included
+
+Alternatively, you can build manually (but this requires embeddings.json to exist):
+
+```bash
 docker build -f csla-mcp-server/Dockerfile -t csla-mcp-server:latest .
 ```
 

@@ -28,6 +28,7 @@ FROM base AS final
 WORKDIR /
 COPY --from=build /src/csla-examples /csla-examples
 WORKDIR /app
-COPY embeddings.json ./embeddings.json
 COPY --from=publish /app/publish .
+# Copy pre-generated embeddings (created by build.sh script)
+COPY embeddings.json ./embeddings.json
 ENTRYPOINT ["dotnet", "csla-mcp-server.dll"]
