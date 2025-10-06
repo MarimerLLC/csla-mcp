@@ -62,18 +62,25 @@ For more detailed configuration information, see [azure-openai-config.md](azure-
 
 ## Vector Embeddings
 
-The server uses pre-generated vector embeddings for semantic search functionality. This significantly reduces startup time and Azure OpenAI API costs.
+The server uses **pre-generated vector embeddings** for semantic search functionality. This significantly reduces startup time and eliminates Azure OpenAI API costs for embedding generation.
 
 ### How It Works
 
-1. **Build Time**: When building the Docker container, the `build.sh` script runs the `csla-embeddings-generator` CLI tool to generate embeddings for all code samples
-2. **Container Build**: The generated `embeddings.json` file is copied into the Docker container
-3. **Runtime**: When the server starts, it loads the pre-generated embeddings from `embeddings.json` instead of regenerating them
-4. **User Queries**: The server still needs Azure OpenAI credentials at runtime to generate embeddings for user search queries
+1. **Embedding Generation** (before running the server):
+   - Run the `csla-embeddings-generator` CLI tool to generate embeddings for all code samples
+   - This creates an `embeddings.json` file containing pre-computed vector embeddings
+   
+2. **Server Startup**:
+   - The server loads the pre-generated embeddings from `embeddings.json` at startup
+   - No embedding generation occurs during server initialization
+   
+3. **Runtime** (user queries):
+   - Azure OpenAI credentials are still required to generate embeddings for user search queries
+   - The server compares user query embeddings against the pre-loaded code sample embeddings
 
-### Generating Embeddings Manually
+### Generating Embeddings
 
-You can manually generate embeddings using the CLI tool:
+**Before running the server**, you must generate embeddings for your code samples:
 
 ```bash
 # Generate embeddings for the default csla-examples directory
@@ -83,13 +90,49 @@ dotnet run --project csla-embeddings-generator
 dotnet run --project csla-embeddings-generator -- --examples-path ./csla-examples --output ./embeddings.json
 ```
 
+This will create an `embeddings.json` file in the current directory (or the specified output path).
+
 See [csla-embeddings-generator/README.md](csla-embeddings-generator/README.md) for more details.
+
+### Configuring Embeddings Path
+
+The server needs to know where to find the `embeddings.json` file. There are three ways to configure this (priority from highest to lowest):
+
+1. **Command-line flag** `--embeddings` or `-e`
+2. **Environment variable** `CSLA_EMBEDDINGS_PATH`
+3. **Default path**: `./embeddings.json` (current directory)
+
+#### Examples
+
+**Using command-line flag:**
+```bash
+dotnet run --project csla-mcp-server -- --embeddings ./path/to/embeddings.json
+```
+
+**Using environment variable (PowerShell):**
+```powershell
+$env:CSLA_EMBEDDINGS_PATH = "S:\src\rdl\csla-mcp\embeddings.json"
+dotnet run --project csla-mcp-server
+```
+
+**Using environment variable (Bash):**
+```bash
+export CSLA_EMBEDDINGS_PATH="/path/to/embeddings.json"
+dotnet run --project csla-mcp-server
+```
+
+**Using default path:**
+```bash
+# Assumes embeddings.json exists in current directory
+dotnet run --project csla-mcp-server
+```
 
 ### Benefits
 
 - **Faster Startup**: Server starts immediately without waiting for embedding generation
-- **Reduced Costs**: Embeddings are only generated once during build time, not on every server restart
-- **Offline Development**: Container includes pre-generated embeddings, reducing dependency on Azure OpenAI during startup
+- **Reduced Costs**: Code sample embeddings are only generated once, not on every server restart
+- **Offline Development**: Server can start without Azure OpenAI (though semantic search requires it for user queries)
+- **Consistent Results**: Same embeddings used across all server instances
 
 ## MCP Tools
 
@@ -219,29 +262,60 @@ For questions about CSLA .NET, visit:
 
 This project includes a multi-stage `Dockerfile` for the `csla-mcp-server` located at `csla-mcp-server/Dockerfile` that builds and publishes the app, then produces a small runtime image.
 
-**Note**: Use the `build.sh` script to build the Docker image, as it first generates the vector embeddings and then builds the container with the embeddings included.
+### Building from Source
 
-Below are commands to build and run the container locally. Run these from the repository root or adjust paths if running from elsewhere.
+**Important**: Before building the Docker image, you must generate vector embeddings for the code samples.
 
-1) Build the Docker image using the build script (recommended):
+Use the `build.sh` script to automate the entire process:
 
 ```bash
 ./build.sh
 ```
 
 This script will:
-- Build the embeddings generator CLI tool
-- Generate embeddings for all code samples
-- Build the Docker image with embeddings included
+1. Build the embeddings generator CLI tool
+2. Generate embeddings for all code samples in `csla-examples/`
+3. Create `embeddings.json` in the repository root
+4. Build the Docker image with embeddings included
 
-Alternatively, you can build manually (but this requires embeddings.json to exist):
+Alternatively, you can perform these steps manually:
 
 ```bash
+# Step 1: Generate embeddings
+dotnet run --project csla-embeddings-generator -- --examples-path ./csla-examples --output ./embeddings.json
+
+# Step 2: Build Docker image
 docker build -f csla-mcp-server/Dockerfile -t csla-mcp-server:latest .
 ```
 
-2) Run the container with Azure OpenAI configuration (maps container port 80 to host port 8080):
+### Using Pre-built Image from Docker Hub
 
+The official pre-built image is available on Docker Hub and already includes pre-generated embeddings:
+
+```bash
+docker pull rockylhotka/csla-mcp-server:latest
+```
+
+This image contains:
+- The csla-mcp-server application
+- Pre-generated embeddings for the official CSLA code samples
+- All necessary runtime dependencies
+
+### Running the Container
+
+Run the container with Azure OpenAI configuration (maps container port 80 to host port 8080):
+
+**Using Docker Hub image:**
+```powershell
+docker run --rm -p 8080:80 `
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
+  -e AZURE_OPENAI_EMBEDDING_MODEL="text-embedding-3-small" `
+  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
+  --name csla-mcp-server rockylhotka/csla-mcp-server:latest
+```
+
+**Using locally built image:**
 ```powershell
 docker run --rm -p 8080:80 `
   -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
@@ -251,60 +325,61 @@ docker run --rm -p 8080:80 `
   --name csla-mcp-server csla-mcp-server:latest
 ```
 
-3) Open your browser to `http://localhost:8080` (or the mapped host port) to access the server. If the server uses a different default endpoint, consult the project `Program.cs` or the server logs printed to the container.
+Open your browser to `http://localhost:8080` to access the server.
 
-Optional: Build with a different tag and pass additional environment variables:
+### Using Custom Embeddings with Docker
 
-```powershell
-docker build -f csla-mcp-server/Dockerfile -t myregistry/csla-mcp-server:v1.0 .
-docker run --rm -p 8080:80 `
-  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
-  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
-  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
-  -e ASPNETCORE_ENVIRONMENT=Development `
-  --name csla-mcp-server myregistry/csla-mcp-server:v1.0
+If you want to use your own embeddings file with the Docker container:
+
+1. Generate your embeddings locally:
+```bash
+dotnet run --project csla-embeddings-generator -- --examples-path ./my-examples --output ./my-embeddings.json
 ```
 
-Notes:
-- The `Dockerfile` uses .NET 10 SDK and ASP.NET runtime images. Ensure your Docker installation supports the required base images.
-- The Docker build will run a `dotnet publish` inside the container; it may take a few minutes the first time as NuGet packages are restored.
-- If you need to debug or iterate quickly during development, consider running the app locally with `dotnet run --project csla-mcp-server/csla-mcp-server.csproj` instead of rebuilding the image for every change.
-- **Important**: The Azure OpenAI environment variables are required for the semantic search functionality to work.
+2. Mount the embeddings file into the container:
+```powershell
+docker run --rm -p 8080:80 `
+  -v "S:\path\to\my-embeddings.json:/app/embeddings.json" `
+  -e CSLA_EMBEDDINGS_PATH="/app/embeddings.json" `
+  -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
+  -e AZURE_OPENAI_API_KEY="your-api-key-here" `
+  --name csla-mcp-server rockylhotka/csla-mcp-server:latest
+```
 
-### Docker: pass the code samples folder into the container
+### Docker: Mounting Custom Code Samples
 
-When running the server in Docker you can mount your host `csla-examples` folder into the container and set the `CSLA_CODE_SAMPLES_PATH` environment variable so the server uses your host examples.
+You can mount your own `csla-examples` folder into the container and set the `CSLA_CODE_SAMPLES_PATH` environment variable:
 
-Example (Linux/macOS or Docker Desktop using Linux containers):
-
+**Linux/macOS:**
 ```bash
 docker run --rm -p 8080:80 \
   -v "/path/on/host/csla-examples:/app/examples" \
   -e CSLA_CODE_SAMPLES_PATH="/app/examples" \
   -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" \
   -e AZURE_OPENAI_API_KEY="your-api-key-here" \
-  -e AZURE_OPENAI_API_VERSION="2024-02-01" \
-  --name csla-mcp-server csla-mcp-server:latest
+  --name csla-mcp-server rockylhotka/csla-mcp-server:latest
 ```
 
-Example (PowerShell on Windows):
-
+**Windows (PowerShell):**
 ```powershell
 docker run --rm -p 8080:80 `
   -v "S:\src\rdl\csla-mcp\csla-examples:/app/examples" `
   -e CSLA_CODE_SAMPLES_PATH="/app/examples" `
   -e AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/" `
   -e AZURE_OPENAI_API_KEY="your-api-key-here" `
-  -e AZURE_OPENAI_API_VERSION="2024-02-01" `
-  --name csla-mcp-server csla-mcp-server:latest
+  --name csla-mcp-server rockylhotka/csla-mcp-server:latest
 ```
 
-Notes:
-- Mount the host examples folder to a path inside the container (for example `/app/examples`) and set the `CSLA_CODE_SAMPLES_PATH` env var to that in-container path.
-- The CLI `-f` flag still overrides the environment variable if you supply it to the container command.
-- If running Windows containers, adjust the mount target and path style appropriately.
+**Note**: If you mount custom code samples, you should also mount custom embeddings that were generated from those samples, otherwise the semantic search results may not match your custom code samples.
 
-## Configuring the code samples folder
+### Docker Build Notes
+
+- The `Dockerfile` uses .NET 10 SDK and ASP.NET runtime images. Ensure your Docker installation supports the required base images.
+- The Docker build includes the `embeddings.json` file that should exist in the repository root before building.
+- If you need to debug or iterate quickly during development, consider running the app locally with `dotnet run --project csla-mcp-server/csla-mcp-server.csproj` instead of rebuilding the image for every change.
+- **Important**: The Azure OpenAI environment variables are required for the semantic search functionality to work at runtime (for user query embeddings).
+
+## Configuring the Code Samples Folder
 
 The MCP server reads code samples and markdown examples from a configurable folder. There are three ways to control which folder is used (priority from highest to lowest):
 
@@ -312,30 +387,27 @@ The MCP server reads code samples and markdown examples from a configurable fold
 2. Environment variable `CSLA_CODE_SAMPLES_PATH`
 3. Built-in default path used by the server code
 
-The command-line flag always overrides the environment variable. If neither is provided the server uses the default examples path (the original behavior).
+The command-line flag always overrides the environment variable. If neither is provided the server uses the default examples path.
 
-Examples
+### Examples
 
-- Run and point to a folder using the `-f` option (PowerShell):
-
+**Run and point to a folder using the `-f` option (PowerShell):**
 ```powershell
 dotnet run --project csla-mcp-server -- -f "S:\src\rdl\csla-mcp\csla-examples"
 ```
 
-- Set the environment variable (PowerShell) and run (no `-f`, env will be used):
-
+**Set the environment variable (PowerShell) and run (no `-f`, env will be used):**
 ```powershell
 $env:CSLA_CODE_SAMPLES_PATH = 'S:\src\rdl\csla-mcp\csla-examples'
 dotnet run --project csla-mcp-server --
 ```
 
-- One-off launch with env var from cmd.exe (Windows):
-
+**One-off launch with env var from cmd.exe (Windows):**
 ```cmd
 set CSLA_CODE_SAMPLES_PATH=S:\src\rdl\csla-mcp\csla-examples && dotnet run --project csla-mcp-server --
 ```
 
-Validation and errors
+### Validation and Errors
 
 - The server validates the provided folder on startup. If the folder does not exist or does not contain any `.cs` or `.md` files the server will print a helpful error and exit with a non-zero code.
 - Exit codes used for validation failures:
