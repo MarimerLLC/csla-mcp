@@ -29,4 +29,6 @@ WORKDIR /
 COPY --from=build /src/csla-examples /csla-examples
 WORKDIR /app
 COPY --from=publish /app/publish .
+# Copy pre-generated embeddings (created by build.sh script)
+COPY embeddings.json ./embeddings.json
 ENTRYPOINT ["dotnet", "csla-mcp-server.dll"]

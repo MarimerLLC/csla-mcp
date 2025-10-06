@@ -5,6 +5,9 @@
 
 changelogs/
 
+# Generated embeddings file
+embeddings.json
+
 # dotenv files
 .env
 
