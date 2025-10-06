@@ -90,7 +90,6 @@ Look for these key log messages:
 [Startup] Using embedding model deployment: text-embedding-3-small
 [Startup] Vector store initialized successfully - semantic search enabled.
 [Startup] Loaded XX pre-generated embeddings from /path/to/embeddings.json
-[Startup] Skipping embedding generation - using pre-generated embeddings
 ```
 
 ### Verification
@@ -98,7 +97,7 @@ Look for these key log messages:
 - No embedding generation messages for individual files
 - Search functionality should work normally
 
-## Test 3: Server - Fallback to Runtime Generation
+## Test 3: Server - Missing Embeddings
 
 ### Remove embeddings.json
 ```bash
@@ -113,16 +112,18 @@ dotnet run
 
 ### Expected Output
 ```
+[Startup] Using Azure OpenAI endpoint: https://...
+[Startup] Using embedding model deployment: text-embedding-3-small
 [Startup] Vector store initialized successfully - semantic search enabled.
-[Startup] No pre-generated embeddings found, will generate embeddings at runtime
-[Startup] Starting to index XX files for semantic search...
-[VectorStore] Indexing document: DataPortalOperationCreate.md (common)
-[Startup] Indexed 5/XX files...
+[Startup] Warning: No pre-generated embeddings found. Semantic search will not be available.
+[Startup] To enable semantic search, generate embeddings using: dotnet run --project csla-embeddings-generator
 ```
 
 ### Verification
-- Server generates embeddings at runtime (slower startup)
-- All functionality works the same as before
+- Server starts quickly
+- Warning message indicates semantic search is not available
+- Keyword search continues to work
+- Server does NOT attempt to generate embeddings at runtime
 
 ## Test 4: Build Script
 
@@ -211,8 +212,8 @@ The implementation is successful if:
 1. ✅ CLI tool generates valid embeddings.json
 2. ✅ Server loads pre-generated embeddings on startup
 3. ✅ Server startup is significantly faster with pre-generated embeddings
-4. ✅ Server falls back to runtime generation if embeddings.json missing
-5. ✅ Semantic search functionality works correctly
+4. ✅ Server provides clear warnings if embeddings.json is missing
+5. ✅ Semantic search functionality works correctly with pre-generated embeddings
 6. ✅ Docker container includes and uses pre-generated embeddings
 7. ✅ Build script generates embeddings before building container
 

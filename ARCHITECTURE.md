@@ -43,15 +43,15 @@
 │         │   ├─> Populates in-memory vector store                    │
 │         │   └─> Ready in seconds                                    │
 │         │                                                            │
-│         └─> If not found (fallback):                                │
-│             ├─> Scans csla-examples/ directory                      │
-│             ├─> Generates embeddings at runtime (SLOW)              │
-│             └─> Ready in 30-60 seconds                              │
+│         └─> If not found:                                           │
+│             ├─> Displays warning message                            │
+│             ├─> Semantic search disabled                            │
+│             └─> Keyword search still available                      │
 │                                                                       │
 │  2. Server handles user requests                                    │
 │     │                                                                │
 │     └─> Search requests:                                            │
-│         ├─> Uses pre-loaded file embeddings                         │
+│         ├─> Uses pre-loaded file embeddings (if available)          │
 │         ├─> Generates embedding for user query (Azure OpenAI)       │
 │         └─> Returns semantic search results                         │
 │                                                                       │
@@ -145,13 +145,14 @@ Search Results
   - Faster container startup
   - Embeddings immutable per build
 
-### 3. Fallback Behavior
-- **Decision**: Fall back to runtime generation if embeddings.json missing
+### 3. No Runtime Generation
+- **Decision**: Server does not generate embeddings for example files at runtime
 - **Rationale**:
-  - Backward compatibility
-  - Development flexibility
-  - Graceful degradation
-  - No breaking changes
+  - Separates concerns (build-time generation vs. runtime loading)
+  - Reduces runtime dependencies on Azure OpenAI for file indexing
+  - Faster startup guaranteed (no waiting for generation)
+  - Clear separation of build-time and runtime operations
+  - Azure OpenAI only needed at runtime for user queries
 
 ### 4. In-Memory Storage
 - **Decision**: Continue using in-memory Dictionary
@@ -192,9 +193,9 @@ Search Results
 - Search latency: Unchanged (still requires user query embedding)
 
 ### Runtime (without embeddings.json)
-- Startup time: 30-60 seconds
-- Memory footprint: Same
-- Search latency: Same
+- Startup time: 2-5 seconds (same as with embeddings)
+- Semantic search: Disabled (keyword search still available)
+- Memory footprint: Minimal (no embeddings loaded)
 
 ## Security Considerations
 

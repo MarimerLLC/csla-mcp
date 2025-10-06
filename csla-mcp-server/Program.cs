@@ -142,101 +142,48 @@ public sealed class RunCommand : Command<AppSettings>
         
         CslaCodeTool.VectorStore = vectorStore;
         
-        // Index all files asynchronously
+        // Load pre-generated embeddings asynchronously
         var indexingTask = Task.Run(async () =>
         {
             try
             {
                 if (vectorStore != null)
                 {
-                    // Try to load pre-generated embeddings from JSON file
+                    // Load pre-generated embeddings from JSON file
                     var embeddingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "embeddings.json");
                     var loadedCount = await vectorStore.LoadEmbeddingsFromJsonAsync(embeddingsPath);
                     
                     if (loadedCount > 0)
                     {
                         Console.WriteLine($"[Startup] Loaded {loadedCount} pre-generated embeddings from {embeddingsPath}");
-                        Console.WriteLine("[Startup] Skipping embedding generation - using pre-generated embeddings");
-                        return;
                     }
                     else
                     {
-                        Console.WriteLine("[Startup] No pre-generated embeddings found, will generate embeddings at runtime");
+                        Console.WriteLine("[Startup] Warning: No pre-generated embeddings found. Semantic search will not be available.");
+                        Console.WriteLine("[Startup] To enable semantic search, generate embeddings using: dotnet run --project csla-embeddings-generator");
                     }
                 }
-                
-                if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
+                else
                 {
-                    // Test connectivity first if vector store is available
-                    bool canIndex = vectorStore == null || await vectorStore.TestConnectivityAsync();
+                    Console.WriteLine("[Startup] Vector store not initialized - semantic search disabled.");
                     
-                    if (!canIndex)
+                    if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
                     {
-                        Console.WriteLine("[Startup] Skipping vector indexing due to Azure OpenAI connectivity issues.");
-                        Console.WriteLine("[Startup] Server will run with keyword search only.");
-                        return;
-                    }
-
-                    var csFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
-                    var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
-                    var allFiles = csFiles.Concat(mdFiles).ToArray();
-                    
-                    if (vectorStore != null)
-                    {
-                        Console.WriteLine($"[Startup] Starting to index {allFiles.Length} files for semantic search...");
-                        
-                        var indexedCount = 0;
-                        foreach (var file in allFiles)
-                        {
-                            try
-                            {
-                                var content = File.ReadAllText(file);
-                                
-                                // Get relative path from CodeSamplesPath
-                                var relativePath = Path.GetRelativePath(CslaCodeTool.CodeSamplesPath, file);
-                                
-                                // Detect version from path
-                                int? version = null;
-                                var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
-                                if (pathParts.Length > 1 && pathParts[0].StartsWith("v") && int.TryParse(pathParts[0].Substring(1), out var versionNumber))
-                                {
-                                    version = versionNumber;
-                                }
-                                
-                                // Normalize path separators to forward slash for consistency
-                                var normalizedPath = relativePath.Replace("\\", "/");
-                                
-                                await vectorStore.IndexDocumentAsync(normalizedPath, content, version);
-                                indexedCount++;
-                                
-                                if (indexedCount % 5 == 0)
-                                {
-                                    Console.WriteLine($"[Startup] Indexed {indexedCount}/{allFiles.Length} files...");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"[Startup] Failed to index file {file}: {ex.Message}");
-                            }
-                        }
-                        
-                        Console.WriteLine($"[Startup] Completed indexing {indexedCount} files");
-                    }
-                    else
-                    {
-                        Console.WriteLine("[Startup] Vector store not available - skipping semantic indexing.");
+                        var csFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
+                        var mdFiles = Directory.GetFiles(CslaCodeTool.CodeSamplesPath, "*.md", SearchOption.AllDirectories);
+                        var allFiles = csFiles.Concat(mdFiles).ToArray();
                         Console.WriteLine($"[Startup] Found {allFiles.Length} files available for keyword search.");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Startup] Error during file indexing: {ex.Message}");
+                Console.WriteLine($"[Startup] Error loading embeddings: {ex.Message}");
             }
         });
         
-        // Don't wait for indexing to complete before starting the server
-        // The server will start immediately and semantic search will become available as indexing progresses
+        // Don't wait for loading embeddings to complete before starting the server
+        // The server will start immediately and semantic search will become available once embeddings are loaded
 
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddMcpServer()

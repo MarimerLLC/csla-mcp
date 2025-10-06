@@ -77,7 +77,7 @@ The Dockerfile now:
 
 1. **Faster Startup**: Server starts immediately, loading pre-generated embeddings from disk
 2. **Reduced Costs**: Embeddings generated once during build, not on every server restart
-3. **Backward Compatibility**: Falls back to runtime generation if embeddings.json is missing
+3. **Simpler Architecture**: Server only loads embeddings, doesn't generate them for example files
 4. **Build-time Validation**: Embedding generation happens during build, catching issues early
 
 ## Usage
@@ -166,9 +166,10 @@ Since this environment doesn't have .NET 10.0 SDK or Azure OpenAI credentials, f
 
 ## Backward Compatibility
 
-The implementation is fully backward compatible:
-- If `embeddings.json` is missing, server generates embeddings at runtime
-- All existing functionality remains unchanged
+The implementation maintains API compatibility:
+- If `embeddings.json` is missing, server will start but semantic search will be disabled
+- Keyword search continues to work without embeddings
+- Users are notified to generate embeddings using the CLI tool
 - No breaking changes to the API or user experience
 
 ## Future Enhancements

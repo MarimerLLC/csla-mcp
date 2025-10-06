@@ -9,7 +9,7 @@ echo "Generating embeddings..."
 dotnet run --project csla-embeddings-generator/csla-embeddings-generator.csproj --configuration Release -- --examples-path ./csla-examples --output ./embeddings.json
 
 # If embeddings.json doesn't exist (e.g., missing Azure credentials), create an empty array JSON file
-# This allows the Docker build to succeed, and the server will fall back to runtime generation
+# This allows the Docker build to succeed, but semantic search will be disabled at runtime
 if [ ! -f ./embeddings.json ]; then
   echo "Warning: embeddings.json not created, creating empty file for Docker build"
   echo "[]" > ./embeddings.json
