@@ -280,5 +280,71 @@ namespace CslaMcpServer.Services
     {
       return _isHealthy;
     }
+
+    /// <summary>
+    /// Loads embeddings from a JSON file into the vector store
+    /// </summary>
+    public async Task<int> LoadEmbeddingsFromJsonAsync(string jsonFilePath)
+    {
+      try
+      {
+        Console.WriteLine($"[VectorStore] Loading embeddings from {jsonFilePath}");
+        
+        if (!File.Exists(jsonFilePath))
+        {
+          Console.WriteLine($"[VectorStore] Embeddings file not found at {jsonFilePath}");
+          return 0;
+        }
+
+        var json = await File.ReadAllTextAsync(jsonFilePath);
+        var embeddings = JsonSerializer.Deserialize<List<DocumentEmbedding>>(json);
+        
+        if (embeddings == null || embeddings.Count == 0)
+        {
+          Console.WriteLine("[VectorStore] No embeddings found in JSON file");
+          return 0;
+        }
+
+        foreach (var embedding in embeddings)
+        {
+          _vectorStore[embedding.FileName] = embedding;
+        }
+
+        Console.WriteLine($"[VectorStore] Successfully loaded {embeddings.Count} embeddings from JSON");
+        return embeddings.Count;
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"[VectorStore] Error loading embeddings from JSON: {ex.Message}");
+        return 0;
+      }
+    }
+
+    /// <summary>
+    /// Exports all embeddings to a JSON file
+    /// </summary>
+    public async Task<bool> ExportEmbeddingsToJsonAsync(string jsonFilePath)
+    {
+      try
+      {
+        Console.WriteLine($"[VectorStore] Exporting embeddings to {jsonFilePath}");
+        
+        var embeddings = _vectorStore.Values.ToList();
+        var json = JsonSerializer.Serialize(embeddings, new JsonSerializerOptions 
+        { 
+          WriteIndented = true 
+        });
+
+        await File.WriteAllTextAsync(jsonFilePath, json);
+        Console.WriteLine($"[VectorStore] Successfully exported {embeddings.Count} embeddings to JSON");
+        
+        return true;
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"[VectorStore] Error exporting embeddings to JSON: {ex.Message}");
+        return false;
+      }
+    }
   }
 }

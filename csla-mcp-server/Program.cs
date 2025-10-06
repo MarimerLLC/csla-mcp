@@ -147,6 +147,24 @@ public sealed class RunCommand : Command<AppSettings>
         {
             try
             {
+                if (vectorStore != null)
+                {
+                    // Try to load pre-generated embeddings from JSON file
+                    var embeddingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "embeddings.json");
+                    var loadedCount = await vectorStore.LoadEmbeddingsFromJsonAsync(embeddingsPath);
+                    
+                    if (loadedCount > 0)
+                    {
+                        Console.WriteLine($"[Startup] Loaded {loadedCount} pre-generated embeddings from {embeddingsPath}");
+                        Console.WriteLine("[Startup] Skipping embedding generation - using pre-generated embeddings");
+                        return;
+                    }
+                    else
+                    {
+                        Console.WriteLine("[Startup] No pre-generated embeddings found, will generate embeddings at runtime");
+                    }
+                }
+                
                 if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
                 {
                     // Test connectivity first if vector store is available
