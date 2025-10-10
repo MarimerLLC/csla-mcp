@@ -203,63 +203,112 @@ namespace CslaMcpServer.Tools
     {
       Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Starting word search for version {version}");
       var results = new List<SearchResult>();
-      
+
+      // Collect candidate documents with version filtering
+      var candidateDocs = new List<(string RelativePath, string Content, int DocLength)>();
       foreach (var file in allFiles)
       {
         try
         {
-          // Get relative path from CodeSamplesPath
           var relativePath = Path.GetRelativePath(CodeSamplesPath, file);
-          
-          // Filter by version: include if in top directory (common) or in matching version subdirectory
           var isCommon = !relativePath.Contains(Path.DirectorySeparatorChar);
           var isMatchingVersion = relativePath.StartsWith($"v{version}{Path.DirectorySeparatorChar}");
-          
+
           if (!isCommon && !isMatchingVersion)
-          {
-            continue; // Skip files from other version directories
-          }
-          
+            continue;
+
           var content = File.ReadAllText(file);
-          var totalScore = 0;
-          
-          foreach (var term in searchTerms)
-          {
-            var count = CountWordOccurrences(content, term);
-            if (count > 0)
-            {
-              // Give higher weight to multi-word phrases
-              var weight = term.Contains(' ') ? 2 : 1;
-              totalScore += count * weight;
-              Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {count} matches for '{term}' in '{relativePath}' (weight: {weight})");
-            }
-          }
-          
-          if (totalScore > 0)
-          {
-            Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found matches in '{relativePath}' with total score {totalScore}");
-            results.Add(new SearchResult
-            {
-              Score = totalScore,
-              FileName = relativePath.Replace("\\", "/") // Normalize path separators
-            });
-          }
+          // Document length as number of word tokens
+          var docLength = GetDocumentLength(content);
+          candidateDocs.Add((relativePath.Replace("\\", "/"), content, docLength));
         }
         catch (Exception ex)
         {
           Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Error reading file {file}: {ex.Message}");
-          // Continue processing other files
         }
       }
-      
-      // Normalize scores using max-score normalization
+
+      var N = candidateDocs.Count;
+      if (N == 0)
+      {
+        Console.WriteLine("[CslaCodeTool.PerformWordSearch] No candidate documents after filtering");
+        return results;
+      }
+
+      var avgDocLength = candidateDocs.Average(d => d.DocLength);
+      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Candidate documents: {N}, AvgDocLength: {avgDocLength:F2}");
+
+      // Compute document frequency n for each term
+      var docFreq = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      foreach (var term in searchTerms)
+      {
+        int n = 0;
+        foreach (var doc in candidateDocs)
+        {
+          var f = CountWordOccurrences(doc.Content, term);
+          if (f > 0) n++;
+        }
+        docFreq[term] = n;
+        Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Term '{term}' appears in {n}/{N} documents");
+      }
+
+      // Compute BM25 score per document as sum over query terms
+      foreach (var doc in candidateDocs)
+      {
+        double score = 0.0;
+        foreach (var term in searchTerms)
+        {
+          var f = CountWordOccurrences(doc.Content, term);
+          var n = docFreq[term];
+
+          if (f <= 0 || n <= 0)
+            continue;
+
+          score += ComputeBM25(
+            f: f,
+            n: n,
+            N: N,
+            docLength: doc.DocLength,
+            avgDocLength: avgDocLength
+          );
+        }
+
+        if (score > 0)
+        {
+          results.Add(new SearchResult
+          {
+            FileName = doc.RelativePath,
+            Score = score
+          });
+        }
+      }
+
+      // Normalize scores using max-score normalization (keeps behavior consistent with vector-score averaging)
       var normalizedResults = NormalizeWordSearchResults(results);
-      
-      // Order by score descending, then by filename
       var sortedResults = normalizedResults.OrderByDescending(r => r.Score).ThenBy(r => r.FileName).ToList();
-      
-      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {sortedResults.Count} word match results");
+
+      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {sortedResults.Count} word match results (BM25)");
       return sortedResults;
+    }
+
+    // BM25 scoring for a single term
+    private static double ComputeBM25(
+      int f, int n, int N, int docLength, double avgDocLength,
+      double k1 = 1.5, double b = 0.75)
+    {
+      // IDF with +1 guard to avoid negative infinity if n == N
+      double idf = Math.Log((N - n + 0.5) / (n + 0.5) + 1);
+      double numerator = f * (k1 + 1);
+      double denominator = f + k1 * (1 - b + b * docLength / avgDocLength);
+      return idf * (numerator / denominator);
+    }
+
+    // Counts number of word tokens in a document (approximate)
+    private static int GetDocumentLength(string content)
+    {
+      // Count word-like tokens (alphanumeric and underscore), culture-invariant
+      var matches = Regex.Matches(content, @"\b\w+\b", RegexOptions.CultureInvariant);
+      return matches.Count;
     }
 
     private static List<SearchResult> NormalizeWordSearchResults(List<SearchResult> results)
