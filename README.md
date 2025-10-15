@@ -32,7 +32,7 @@ docker run --rm -p 8080:8080 `
 ```
 
 > ℹ️ The container image includes pre-generated embeddings and CSLA code examples.
-
+>
 > ℹ️ The container exposes port 8080 by default. You can map it to a different port on your host (e.g., `-p 9000:8080`).
 
 To enable semantic search with vector embeddings, provide Azure OpenAI credentials:
@@ -46,7 +46,7 @@ docker run --rm -p 8080:8080 `
 
 > ⚠️ Azure OpenAI credentials are required to generate embeddings for user search queries at runtime.
 
-**Optional: Override embedded data with custom examples**
+#### Optional: Override embedded data with custom examples
 
 If you want to use your own code examples or updated embeddings, you can override the embedded data with volume mounts:
 
@@ -64,10 +64,12 @@ docker run --rm -p 8080:8080 `
 The server uses Azure OpenAI for vector embeddings to provide semantic search capabilities. You must configure the following environment variables:
 
 #### Required Environment Variables
+
 - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI service endpoint (e.g., `https://your-resource.openai.azure.com/`)
 - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
 
 #### Optional Environment Variables
+
 - `AZURE_OPENAI_EMBEDDING_MODEL`: The embedding model deployment name to use (default: `text-embedding-3-large`)
 - `AZURE_OPENAI_API_VERSION`: The API version to use (default: `2024-02-01`)
 
@@ -78,6 +80,7 @@ The server uses Azure OpenAI for vector embeddings to provide semantic search ca
 **Quick Setup**: See [azure-openai-setup-guide.md](azure-openai-setup-guide.md) for step-by-step instructions.
 
 To deploy a model:
+
 1. Go to [Azure OpenAI Studio](https://oai.azure.com/)
 2. Navigate to "Deployments"
 3. Create a new deployment with the model `text-embedding-3-large`
@@ -88,6 +91,7 @@ To deploy a model:
 #### Example Configuration
 
 **PowerShell (Windows):**
+
 ```powershell
 $env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
 $env:AZURE_OPENAI_API_KEY = "your-api-key-here"
@@ -96,6 +100,7 @@ $env:AZURE_OPENAI_API_VERSION = "2024-02-01"  # Optional, API version
 ```
 
 **Bash (Linux/macOS):**
+
 ```bash
 export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 export AZURE_OPENAI_API_KEY="your-api-key-here"
@@ -114,11 +119,9 @@ The server uses **pre-generated vector embeddings** for semantic search function
 1. **Embedding Generation** (before running the server):
    - Run the `csla-embeddings-generator` CLI tool to generate embeddings for all code samples
    - This creates an `embeddings.json` file containing pre-computed vector embeddings
-   
 2. **Server Startup**:
    - The server loads the pre-generated embeddings from `embeddings.json` at startup
    - No embedding generation occurs during server initialization
-   
 3. **Runtime** (user queries):
    - Azure OpenAI credentials are still required to generate embeddings for user search queries
    - The server compares user query embeddings against the pre-loaded code sample embeddings
@@ -162,23 +165,27 @@ The server needs to know where to find the CSLA code samples. There are three wa
 #### Examples
 
 **Using command-line flag:**
+
 ```bash
 dotnet run --project csla-mcp-server -- run --folder ./csla-examples
 ```
 
 **Using environment variable (PowerShell):**
+
 ```powershell
 $env:CSLA_CODE_SAMPLES_PATH = "S:\src\rdl\csla-mcp\csla-examples"
 dotnet run --project csla-mcp-server -- run
 ```
 
 **Using environment variable (Bash):**
+
 ```bash
 export CSLA_CODE_SAMPLES_PATH="/path/to/csla-examples"
 dotnet run --project csla-mcp-server -- run
 ```
 
 **Using default path:**
+
 ```bash
 # When running from the repository root, the default ../csla-examples works automatically
 dotnet run --project csla-mcp-server -- run
@@ -203,6 +210,7 @@ The server currently exposes two MCP tools implemented in the `CslaCodeTool` cla
 - `Fetch` — return the raw content of a named code sample or markdown file.
 
 Both tools operate over the repository folder that contains the example files. By default, this is `../csla-examples` relative to the server executable, but this can be configured using:
+
 - The `--folder` or `-f` command-line option
 - The `CSLA_CODE_SAMPLES_PATH` environment variable
 - When running from the repository root, the default resolves to `csla-examples/`
@@ -212,6 +220,7 @@ Both tools operate over the repository folder that contains the example files. B
 Description: Extracts significant words from the provided input text and searches `.cs` and `.md` files under the examples folder for occurrences of those words. Returns a JSON array of consolidated search results that merge semantic (vector-based) and word-based (keyword) search scores.
 
 Parameters:
+
 - `message` (string, required): Natural language text or keywords to search for. Words of length 4 or less are ignored by the tool. The tool also searches for 2-word combinations from adjacent words to find phrase matches (e.g., "create operation" and "operation method" from "create operation method").
 - `version` (integer, optional): CSLA version number to filter results (e.g., `9` or `10`). If not provided, defaults to the highest version available by scanning version subdirectories in the examples folder (e.g., `v9/`, `v10/`). Files in the root directory (common to all versions) are included regardless of the specified version.
 
@@ -252,6 +261,7 @@ Example call without version (uses highest available):
 ```
 
 Notes and behavior:
+
 - The tool ignores short words (<= 3 characters) when building the search terms.
 - The tool creates 2-word combinations from adjacent words in the search message to find phrase matches. Multi-word phrase matches receive higher scores (weight of 2) compared to single word matches (weight of 1).
 - Word matching uses word boundaries to ensure exact matches. For example, searching for "property" will not match "ReadProperty" or "GetProperty".
@@ -265,6 +275,7 @@ Notes and behavior:
 Description: Returns the text contents of a specific file from the configured code samples folder by file name.
 
 Parameters:
+
 - `fileName` (string, required): The name or relative path of the file to fetch (for example, `ReadOnlyProperty.md`, `v10/EditableRoot.md`, or `MyBusinessClass.cs`). The tool resolves the file by combining the configured code samples path with the given file name. Path traversal attempts (e.g., `../`) are blocked for security.
 
 Output: Raw file contents as a string. If the file is not found or the path is invalid, the tool returns a JSON error object with `Error` and `Message` fields.
@@ -282,6 +293,7 @@ Example call (MCP `tools/call`):
 ```
 
 Security note:
+
 - The implementation validates file paths to prevent path traversal attacks. Only files within the configured code samples directory can be accessed. Relative paths like `../` or absolute paths are rejected.
 
 ## Integration with AI Assistants
