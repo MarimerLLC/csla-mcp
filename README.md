@@ -59,6 +59,57 @@ docker run --rm -p 8080:8080 `
   --name csla-mcp-server rockylhotka/csla-mcp-server:latest
 ```
 
+## Connecting to the MCP Server
+
+Once the server is running, you can connect to it from MCP-compatible tools like VS Code with GitHub Copilot.
+
+### Connecting from VS Code
+
+1. **Install the GitHub Copilot Chat extension** in VS Code (if not already installed)
+
+2. **Open VS Code Settings** (File > Preferences > Settings or `Ctrl+,`)
+
+3. **Search for "MCP"** in the settings search bar
+
+4. **Find "Chat > MCP: Servers"** and click "Edit in settings.json"
+
+5. **Add your MCP server configuration** to the `github.copilot.chat.mcp.servers` object:
+
+   ```json
+   {
+     "github.copilot.chat.mcp.servers": {
+       "csla-mcp": {
+         "type": "http",
+         "url": "http://localhost:8080/mcp"
+       }
+     }
+   }
+   ```
+
+   > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000/mcp`
+
+6. **Restart VS Code** to apply the changes
+
+7. **Verify the connection**: Open GitHub Copilot Chat and you should now be able to use the CSLA MCP tools in your conversations. The server provides two tools:
+   - `Search` - Search CSLA code examples and documentation
+   - `Fetch` - Retrieve specific code examples by filename
+
+### Testing the Connection
+
+You can test the MCP server is working by asking GitHub Copilot questions about CSLA, such as:
+
+- "Show me how to create an editable root business object in CSLA"
+- "How do I implement a read-only property in CSLA?"
+- "What's an example of using the data portal in CSLA?"
+
+Copilot will use the MCP server tools to search for and retrieve relevant CSLA code examples.
+
+### Troubleshooting
+
+- **Connection failed**: Ensure the Docker container is running (`docker ps`) and accessible at the configured URL
+- **No results**: Check the server logs (`docker logs csla-mcp-server`) for errors
+- **Semantic search not working**: Verify Azure OpenAI environment variables are set correctly
+
 ### Azure OpenAI Configuration
 
 The server uses Azure OpenAI for vector embeddings to provide semantic search capabilities. You must configure the following environment variables:
