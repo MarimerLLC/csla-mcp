@@ -12,7 +12,7 @@ public class EmbeddingsGenerator
     private readonly AzureOpenAIClient _openAIClient;
     private readonly string _embeddingModelName;
 
-    public EmbeddingsGenerator(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-small")
+    public EmbeddingsGenerator(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-large")
     {
         var clientOptions = new AzureOpenAIClientOptions();
         _openAIClient = new AzureOpenAIClient(new Uri(azureOpenAIEndpoint), new AzureKeyCredential(azureOpenAIApiKey), clientOptions);

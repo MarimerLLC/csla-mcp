@@ -28,7 +28,7 @@ namespace CslaMcpServer.Services
       public float SimilarityScore { get; set; }
     }
 
-    public VectorStoreService(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-small", string apiVersion = "2024-02-01")
+    public VectorStoreService(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-large", string apiVersion = "2024-02-01")
     {
       // Use the latest available service version as default
       var clientOptions = new AzureOpenAIClientOptions();
@@ -105,7 +105,7 @@ namespace CslaMcpServer.Services
       {
         Console.WriteLine($"[VectorStore] Bad Request (400): {ex.Message}");
         Console.WriteLine("[VectorStore] This might be an API version compatibility issue.");
-        Console.WriteLine("[VectorStore] For text-embedding-3-small: Ensure you're using a recent API version");
+        Console.WriteLine("[VectorStore] For text-embedding-3-large: Ensure you're using a recent API version");
         Console.WriteLine("[VectorStore] For text-embedding-ada-002: Try setting AZURE_OPENAI_API_VERSION to a compatible version");
         Console.WriteLine("[VectorStore] Disabling semantic search for this session.");
         _isHealthy = false;

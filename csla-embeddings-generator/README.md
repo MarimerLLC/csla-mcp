@@ -9,11 +9,11 @@ This tool pre-generates vector embeddings for all code samples in the `csla-exam
 ## Prerequisites
 
 - .NET 10.0 SDK
-- Azure OpenAI service with a deployed embedding model (e.g., `text-embedding-3-small`)
+- Azure OpenAI service with a deployed embedding model (e.g., `text-embedding-3-large`)
 - Required environment variables:
   - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI service endpoint
   - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
-  - `AZURE_OPENAI_EMBEDDING_MODEL` (optional): The embedding model deployment name (default: `text-embedding-3-small`)
+  - `AZURE_OPENAI_EMBEDDING_MODEL` (optional): The embedding model deployment name (default: `text-embedding-3-large`)
 
 ## Usage
 
