@@ -7,9 +7,9 @@ using CslaMcpServer.Services;
 namespace CslaMcpServer.Tools
 {
   [McpServerToolType]
-  public class CslaCodeTool
+  public sealed class CslaCodeTool(ILogger<CslaCodeTool> logger)
   {
-  public static string CodeSamplesPath { get; set; } = @"../csla-examples";
+    public static string CodeSamplesPath { get; set; } = @"../csla-examples";
     public static VectorStoreService? VectorStore { get; set; }
 
     public class SearchResult
@@ -39,21 +39,21 @@ namespace CslaMcpServer.Tools
     }
 
     [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON array of consolidated search results that merge semantic and word search scores.")]
-    public static string Search(
+    public async Task<string> Search(
       [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message,
       [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
     {
-      Console.WriteLine($"[CslaCodeTool.Search] Called with message: '{message}', version: {version?.ToString() ?? "not specified (will use highest)"}");
+      logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
       
       try
       {
-        Console.WriteLine($"[CslaCodeTool.Search] Using CodeSamplesPath: '{CodeSamplesPath}'");
+        logger.LogInformation("[CslaCodeTool.Search] Using CodeSamplesPath: '{Path}'", CodeSamplesPath);
         
         // Check if the CodeSamplesPath exists
         if (!Directory.Exists(CodeSamplesPath))
         {
           var error = $"Code samples path does not exist: {CodeSamplesPath}";
-          Console.WriteLine($"[CslaCodeTool.Search] Error: {error}");
+          logger.LogError("[CslaCodeTool.Search] Error: {Error}", error);
           return JsonSerializer.Serialize(new ErrorResult 
           { 
             Error = "PathNotFound", 
@@ -65,14 +65,14 @@ namespace CslaMcpServer.Tools
         if (!version.HasValue)
         {
           version = GetHighestVersionFromFileSystem();
-          Console.WriteLine($"[CslaCodeTool.Search] Version not specified, defaulting to highest: v{version}");
+          logger.LogInformation("[CslaCodeTool.Search] Version not specified, defaulting to highest: v{Version}", version);
         }
 
         var csFiles = Directory.GetFiles(CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
         var mdFiles = Directory.GetFiles(CodeSamplesPath, "*.md", SearchOption.AllDirectories);
         var allFiles = csFiles.Concat(mdFiles);
         
-        Console.WriteLine($"[CslaCodeTool.Search] Found {csFiles.Length} .cs files and {mdFiles.Length} .md files");
+        logger.LogInformation("[CslaCodeTool.Search] Found {CsFiles} .cs files and {MdFiles} .md files", csFiles.Length, mdFiles.Length);
         
         // Extract words from the message, preserving order for multi-word combinations
         var allWords = message
@@ -101,13 +101,13 @@ namespace CslaMcpServer.Tools
         searchTerms.AddRange(singleWords);
         searchTerms.AddRange(twoWordPhrases);
 
-        Console.WriteLine($"[CslaCodeTool.Search] Extracted single words: [{string.Join(", ", singleWords)}]");
-        Console.WriteLine($"[CslaCodeTool.Search] Extracted 2-word phrases: [{string.Join(", ", twoWordPhrases)}]");
-        Console.WriteLine($"[CslaCodeTool.Search] Total search terms: {searchTerms.Count}");
+        logger.LogInformation("[CslaCodeTool.Search] Extracted single words: [{Words}]", string.Join(", ", singleWords));
+        logger.LogInformation("[CslaCodeTool.Search] Extracted2-word phrases: [{Phrases}]", string.Join(", ", twoWordPhrases));
+        logger.LogInformation("[CslaCodeTool.Search] Total search terms: {Count}", searchTerms.Count);
 
         if (!searchTerms.Any())
         {
-          Console.WriteLine("[CslaCodeTool.Search] No search terms found, returning empty results");
+          logger.LogInformation("[CslaCodeTool.Search] No search terms found, returning empty results");
           return JsonSerializer.Serialize(new List<ConsolidatedSearchResult>());
         }
 
@@ -124,14 +124,14 @@ namespace CslaMcpServer.Tools
         // Create consolidated results
         var consolidatedResults = ConsolidateSearchResults(semanticMatches, wordMatches);
         
-        Console.WriteLine($"[CslaCodeTool.Search] Returning {consolidatedResults.Count} consolidated results");
+        logger.LogInformation("[CslaCodeTool.Search] Returning {Count} consolidated results", consolidatedResults.Count);
         
         return JsonSerializer.Serialize(consolidatedResults, new JsonSerializerOptions { WriteIndented = true });
       }
       catch (Exception ex)
       {
         var error = $"Search operation failed: {ex.Message}";
-        Console.WriteLine($"[CslaCodeTool.Search] Error: {error}");
+        logger.LogError(ex, "[CslaCodeTool.Search] Error: {Error}", error);
         return JsonSerializer.Serialize(new ErrorResult 
         { 
           Error = "SearchFailed", 
@@ -140,9 +140,9 @@ namespace CslaMcpServer.Tools
       }
     }
 
-    private static List<ConsolidatedSearchResult> ConsolidateSearchResults(List<SemanticMatch> semanticMatches, List<SearchResult> wordMatches)
+    private List<ConsolidatedSearchResult> ConsolidateSearchResults(List<SemanticMatch> semanticMatches, List<SearchResult> wordMatches)
     {
-      Console.WriteLine("[CslaCodeTool.ConsolidateSearchResults] Starting result consolidation");
+      logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Starting result consolidation");
       
       var consolidatedResults = new Dictionary<string, ConsolidatedSearchResult>();
       
@@ -170,7 +170,7 @@ namespace CslaMcpServer.Tools
           var existing = consolidatedResults[word.FileName];
           existing.WordScore = word.Score;
           existing.Score = (existing.VectorScore.GetValueOrDefault(0) + word.Score) / 2.0;
-          Console.WriteLine($"[CslaCodeTool.ConsolidateSearchResults] Merged scores for '{word.FileName}': Vector={existing.VectorScore:F3}, Word={existing.WordScore:F3}, Average={existing.Score:F3}");
+          logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Merged scores for '{File}': Vector={Vector:F3}, Word={Word:F3}, Average={Avg:F3}", word.FileName, existing.VectorScore, existing.WordScore, existing.Score);
         }
         else
         {
@@ -191,17 +191,17 @@ namespace CslaMcpServer.Tools
         .ThenBy(r => r.FileName)
         .ToList();
       
-      Console.WriteLine($"[CslaCodeTool.ConsolidateSearchResults] Consolidated {consolidatedResults.Count} unique files");
-      Console.WriteLine($"[CslaCodeTool.ConsolidateSearchResults] Files with both scores: {consolidatedResults.Values.Count(r => r.VectorScore.HasValue && r.WordScore.HasValue)}");
-      Console.WriteLine($"[CslaCodeTool.ConsolidateSearchResults] Files with only vector scores: {consolidatedResults.Values.Count(r => r.VectorScore.HasValue && !r.WordScore.HasValue)}");
-      Console.WriteLine($"[CslaCodeTool.ConsolidateSearchResults] Files with only word scores: {consolidatedResults.Values.Count(r => !r.VectorScore.HasValue && r.WordScore.HasValue)}");
+      logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Consolidated {Count} unique files", consolidatedResults.Count);
+      logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Files with both scores: {Count}", consolidatedResults.Values.Count(r => r.VectorScore.HasValue && r.WordScore.HasValue));
+      logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Files with only vector scores: {Count}", consolidatedResults.Values.Count(r => r.VectorScore.HasValue && !r.WordScore.HasValue));
+      logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Files with only word scores: {Count}", consolidatedResults.Values.Count(r => !r.VectorScore.HasValue && r.WordScore.HasValue));
       
       return sortedResults;
     }
 
-    private static List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms, int version)
+    private List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms, int version)
     {
-      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Starting word search for version {version}");
+      logger.LogInformation("[CslaCodeTool.PerformWordSearch] Starting word search for version {Version}", version);
       var results = new List<SearchResult>();
 
       // Collect candidate documents with version filtering
@@ -224,19 +224,19 @@ namespace CslaMcpServer.Tools
         }
         catch (Exception ex)
         {
-          Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Error reading file {file}: {ex.Message}");
+          logger.LogError(ex, "[CslaCodeTool.PerformWordSearch] Error reading file {File}: {Message}", file, ex.Message);
         }
       }
 
       var N = candidateDocs.Count;
       if (N == 0)
       {
-        Console.WriteLine("[CslaCodeTool.PerformWordSearch] No candidate documents after filtering");
+        logger.LogInformation("[CslaCodeTool.PerformWordSearch] No candidate documents after filtering");
         return results;
       }
 
       var avgDocLength = candidateDocs.Average(d => d.DocLength);
-      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Candidate documents: {N}, AvgDocLength: {avgDocLength:F2}");
+      logger.LogInformation("[CslaCodeTool.PerformWordSearch] Candidate documents: {N}, AvgDocLength: {Avg:F2}", N, avgDocLength);
 
       // Compute document frequency n for each term
       var docFreq = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -249,7 +249,7 @@ namespace CslaMcpServer.Tools
           if (f > 0) n++;
         }
         docFreq[term] = n;
-        Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Term '{term}' appears in {n}/{N} documents");
+        logger.LogInformation("[CslaCodeTool.PerformWordSearch] Term '{Term}' appears in {N}/{Total} documents", term, n, N);
       }
 
       // Compute BM25 score per document as sum over query terms
@@ -287,7 +287,7 @@ namespace CslaMcpServer.Tools
       var normalizedResults = NormalizeWordSearchResults(results);
       var sortedResults = normalizedResults.OrderByDescending(r => r.Score).ThenBy(r => r.FileName).ToList();
 
-      Console.WriteLine($"[CslaCodeTool.PerformWordSearch] Found {sortedResults.Count} word match results (BM25)");
+      logger.LogInformation("[CslaCodeTool.PerformWordSearch] Found {Count} word match results (BM25)", sortedResults.Count);
       return sortedResults;
     }
 
@@ -311,20 +311,20 @@ namespace CslaMcpServer.Tools
       return matches.Count;
     }
 
-    private static List<SearchResult> NormalizeWordSearchResults(List<SearchResult> results)
+    private List<SearchResult> NormalizeWordSearchResults(List<SearchResult> results)
     {
       if (!results.Any())
       {
-        Console.WriteLine("[CslaCodeTool.NormalizeWordSearchResults] No results to normalize");
+        logger.LogInformation("[CslaCodeTool.NormalizeWordSearchResults] No results to normalize");
         return results;
       }
       
       var maxScore = results.Max(r => r.Score);
-      Console.WriteLine($"[CslaCodeTool.NormalizeWordSearchResults] Normalizing {results.Count} results with max score: {maxScore}");
+      logger.LogInformation("[CslaCodeTool.NormalizeWordSearchResults] Normalizing {Count} results with max score: {Max}", results.Count, maxScore);
       
       if (maxScore <= 0)
       {
-        Console.WriteLine("[CslaCodeTool.NormalizeWordSearchResults] Max score is 0 or negative, returning original results");
+        logger.LogInformation("[CslaCodeTool.NormalizeWordSearchResults] Max score is 0 or negative, returning original results");
         return results;
       }
       
@@ -334,40 +334,40 @@ namespace CslaMcpServer.Tools
         Score = r.Score / maxScore
       }).ToList();
       
-      Console.WriteLine($"[CslaCodeTool.NormalizeWordSearchResults] Normalized scores range from {normalizedResults.Min(r => r.Score):F3} to {normalizedResults.Max(r => r.Score):F3}");
+      logger.LogInformation("[CslaCodeTool.NormalizeWordSearchResults] Normalized scores range from {Min:F3} to {Max:F3}", normalizedResults.Min(r => r.Score), normalizedResults.Max(r => r.Score));
       
       return normalizedResults;
     }
 
-    private static List<SemanticMatch> PerformSemanticSearch(string message, int? version)
+    private List<SemanticMatch> PerformSemanticSearch(string message, int? version)
     {
-      Console.WriteLine($"[CslaCodeTool.PerformSemanticSearch] Starting semantic search for version {version}");
+      logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Starting semantic search for version {Version}", version);
       var semanticMatches = new List<SemanticMatch>();
       
       if (VectorStore != null && VectorStore.IsReady())
       {
-        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Performing semantic search");
+        logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Performing semantic search");
         var semanticResults = VectorStore.SearchAsync(message, version, topK: 10).GetAwaiter().GetResult();
         semanticMatches = semanticResults.Select(r => new SemanticMatch
         {
           FileName = r.FileName,
           SimilarityScore = r.SimilarityScore
         }).ToList();
-        Console.WriteLine($"[CslaCodeTool.PerformSemanticSearch] Found {semanticMatches.Count} semantic matches");
+        logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Found {Count} semantic matches", semanticMatches.Count);
       }
       else if (VectorStore != null && !VectorStore.IsHealthy())
       {
-        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Semantic search unavailable due to Azure OpenAI configuration issues");
+        logger.LogWarning("[CslaCodeTool.PerformSemanticSearch] Semantic search unavailable due to Azure OpenAI configuration issues");
       }
       else
       {
-        Console.WriteLine("[CslaCodeTool.PerformSemanticSearch] Vector store not available, using keyword search only");
+        logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Vector store not available, using keyword search only");
       }
       
       return semanticMatches;
     }
 
-    private static int GetHighestVersionFromFileSystem()
+    private int GetHighestVersionFromFileSystem()
     {
       try
       {
@@ -380,18 +380,18 @@ namespace CslaMcpServer.Tools
         if (versionDirs.Any())
         {
           var highest = versionDirs.Max();
-          Console.WriteLine($"[CslaCodeTool.GetHighestVersionFromFileSystem] Found versions: [{string.Join(", ", versionDirs.OrderBy(v => v))}], highest: {highest}");
+          logger.LogInformation("[CslaCodeTool.GetHighestVersionFromFileSystem] Found versions: [{Versions}], highest: {Highest}", string.Join(", ", versionDirs.OrderBy(v => v)), highest);
           return highest;
         }
       }
       catch (Exception ex)
       {
-        Console.WriteLine($"[CslaCodeTool.GetHighestVersionFromFileSystem] Error detecting versions: {ex.Message}");
+        logger.LogError(ex, "[CslaCodeTool.GetHighestVersionFromFileSystem] Error detecting versions: {Message}", ex.Message);
       }
       
       // No version directories found - return a reasonable default
       // This will be used when all content is in the root directory (common to all versions)
-      Console.WriteLine("[CslaCodeTool.GetHighestVersionFromFileSystem] No version directories found, defaulting to latest known CSLA version");
+      logger.LogInformation("[CslaCodeTool.GetHighestVersionFromFileSystem] No version directories found, defaulting to latest known CSLA version");
       return 10; // Default fallback when no version subdirectories exist
     }
 
@@ -416,19 +416,19 @@ namespace CslaMcpServer.Tools
     }
 
     [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet.")]
-    public static string Fetch([Description("FileName from the search tool.")]string fileName)
+    public async Task<string> Fetch([Description("FileName from the search tool.")]string fileName)
     {
-      Console.WriteLine($"[CslaCodeTool.Fetch] Called with fileName: '{fileName}'");
+      logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
       
       try
       {
-        Console.WriteLine($"[CslaCodeTool.Fetch] Using CodeSamplesPath: '{CodeSamplesPath}'");
+        logger.LogInformation("[CslaCodeTool.Fetch] Using CodeSamplesPath: '{Path}'", CodeSamplesPath);
         
         // Validate fileName to prevent path traversal attacks
         if (string.IsNullOrWhiteSpace(fileName))
         {
           var error = "File name cannot be empty or null";
-          Console.WriteLine($"[CslaCodeTool.Fetch] Error: {error}");
+          logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
           return JsonSerializer.Serialize(new ErrorResult 
           { 
             Error = "InvalidFileName", 
@@ -440,7 +440,7 @@ namespace CslaMcpServer.Tools
         if (fileName.Contains("..") || Path.IsPathRooted(fileName))
         {
           var error = $"Invalid file name: {fileName}. Only relative file names are allowed.";
-          Console.WriteLine($"[CslaCodeTool.Fetch] Error: {error}");
+          logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
           return JsonSerializer.Serialize(new ErrorResult 
           { 
             Error = "InvalidFileName", 
@@ -452,7 +452,7 @@ namespace CslaMcpServer.Tools
         if (!Directory.Exists(CodeSamplesPath))
         {
           var error = $"Code samples path does not exist: {CodeSamplesPath}";
-          Console.WriteLine($"[CslaCodeTool.Fetch] Error: {error}");
+          logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
           return JsonSerializer.Serialize(new ErrorResult 
           { 
             Error = "PathNotFound", 
@@ -463,18 +463,18 @@ namespace CslaMcpServer.Tools
         // Normalize path separator to system default
         var normalizedFileName = fileName.Replace("/", Path.DirectorySeparatorChar.ToString());
         var filePath = Path.Combine(CodeSamplesPath, normalizedFileName);
-        Console.WriteLine($"[CslaCodeTool.Fetch] Attempting to read file: '{filePath}'");
+        logger.LogInformation("[CslaCodeTool.Fetch] Attempting to read file: '{FilePath}'", filePath);
         
         if (File.Exists(filePath))
         {
           var content = File.ReadAllText(filePath);
-          Console.WriteLine($"[CslaCodeTool.Fetch] Successfully read file '{fileName}' ({content.Length} characters)");
+          logger.LogInformation("[CslaCodeTool.Fetch] Successfully read file '{FileName}' ({Length} characters)", fileName, content.Length);
           return content;
         }
         else
         {
           var error = $"File '{fileName}' not found in code samples directory";
-          Console.WriteLine($"[CslaCodeTool.Fetch] Error: {error}");
+          logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
           return JsonSerializer.Serialize(new ErrorResult 
           { 
             Error = "FileNotFound", 
@@ -485,7 +485,7 @@ namespace CslaMcpServer.Tools
       catch (Exception ex)
       {
         var error = $"Fetch operation failed: {ex.Message}";
-        Console.WriteLine($"[CslaCodeTool.Fetch] Error: {error}");
+        logger.LogError(ex, "[CslaCodeTool.Fetch] Error: {Error}", error);
         return JsonSerializer.Serialize(new ErrorResult 
         { 
           Error = "FetchFailed", 
