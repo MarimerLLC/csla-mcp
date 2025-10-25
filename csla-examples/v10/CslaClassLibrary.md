@@ -14,9 +14,10 @@ Most CSLA .NET applications use a class library project to hold the business cla
 
   <ItemGroup>
     <PackageReference Include="Csla" Version="10.0.0" />
-    <PackageReference Include="Csla.Generator.AutoImplementProperties.CSharp" Version="10.0.0" 
-					  OutputItemType="Analyzer"
-					  ReferenceOutputAssembly="false"/>
+    <PackageReference Include="Csla.Generator.AutoImplementProperties.CSharp" Version="10.0.0">
+      <PrivateAssets>analyzers</PrivateAssets>
+      <IncludeAssets>all</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 </Project>
 ```
