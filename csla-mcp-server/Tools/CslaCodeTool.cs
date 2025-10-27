@@ -38,9 +38,16 @@ namespace CslaMcpServer.Tools
       public string Message { get; set; } = string.Empty;
     }
 
-    [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON array of consolidated search results that merge semantic and word search scores.")]
+    private const string toolDescription = @" 
+      Searches CSLA .NET documentation and code samples for examples of how to 
+      implement code that makes use of #cslanet. Returns a JSON array of 
+      consolidated search results that merge semantic and word search scores.
+      Use the Fetch tool to retrieve specific code samples by file name.
+      Fetch 'Glossary.md' for definitions of CSLA concepts and terms.";
+
+    [McpServerTool, Description(toolDescription)]
     public async Task<string> Search(
-      [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message,
+      [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list, business rule, authorization rule.")]string message,
       [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
     {
       logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
