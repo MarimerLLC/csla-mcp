@@ -6,11 +6,13 @@ In this model there are typically three projects involved:
 
 1. Business logic layer (class library project containing the business domain types)
 2. Data access abstractions (class library project containing interfaces and entity or data transfer (DTO) types)
-3. Data access implementation (class library project containing the concrete implementation of the interfaces in the data acess abstractions project)
+3. Data access implementation (class library project containing the concrete implementation of the interfaces in the data access abstractions project)
 
 This separation of concerns allows multiple concrete implementations of the data access layer and provides total separation between the business layer and any data access layer artifacts or technologies.
 
 Many people prefer to use Entity Framework as their abstraction, in which case projects 2 and 3 might be combined into a single EF project.
+
+> **Note:** The patterns shown in this document apply to any RDBMS supported by ADO.NET and/or Entity Framework, including SQL Server, PostgreSQL, SQLite, MySQL, Oracle, and others. The examples use SQL Server, but the same principles apply to other databases with appropriate provider-specific adjustments.
 
 ## Business classes
 

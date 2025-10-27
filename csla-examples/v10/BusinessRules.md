@@ -53,13 +53,8 @@ BusinessRules.AddRule(new MinValue<int>(PropertyInfo, 0));
 BusinessRules.AddRule(new MaxValue<int>(PropertyInfo, 100));
 BusinessRules.AddRule(new Range<decimal>(PropertyInfo, 0.01m, 999.99m));
 
-// Comparison
+// Rule relationships
 BusinessRules.AddRule(new Dependency(PropertyInfo, DependentProperty));
-BusinessRules.AddRule(new StopIfNotCanWrite(PropertyInfo));
-
-// Relationship
-BusinessRules.AddRule(new Required(ParentProperty));
-BusinessRules.AddRule(new Required(ChildListProperty));
 ```
 
 ## Custom Business Rules
@@ -169,7 +164,7 @@ public class CalculateTotal : BusinessRule
     private IPropertyInfo _totalProperty;
     
     public CalculateTotal(IPropertyInfo quantityProperty, IPropertyInfo priceProperty, IPropertyInfo totalProperty)
-        : base(totalProperty)
+        : base(quantityProperty)
     {
         _quantityProperty = quantityProperty;
         _priceProperty = priceProperty;
@@ -206,6 +201,7 @@ public partial class OrderItem : BusinessBase<OrderItem>
     {
         base.AddBusinessRules();
         BusinessRules.AddRule(new CalculateTotal(QuantityProperty, PriceProperty, TotalProperty));
+        BusinessRules.AddRule(new Dependency(PriceProperty, QuantityProperty));
     }
 }
 ```
@@ -230,13 +226,12 @@ public class CheckEmailUnique : BusinessRuleAsync
         
         if (string.IsNullOrWhiteSpace(email))
             return;
-        
-        // Get service from DI container
-        var dal = ApplicationContext.GetRequiredService<ICustomerDal>();
-        
-        var exists = await dal.EmailExistsAsync(email);
-        
-        if (exists)
+
+        // Execute a command object to check if email exists
+        var portal = ApplicationContext.GetRequiredService<IDataPortal<EmailExistsCommand>>();
+        var command = await portal.ExecuteAsync(email);
+
+        if (command.Exists)
         {
             context.AddErrorResult("Email address is already in use");
         }
@@ -257,6 +252,8 @@ public partial class Customer : BusinessBase<Customer>
 }
 ```
 
+> **Note:** A rule's `Execute` or `ExecuteAsync` method must NEVER directly talk to the database or any external API. Any such operations MUST flow through something like a command object.
+
 ## Authorization Rules
 
 Authorization rules control whether users can read, write, or execute operations on objects and properties.
@@ -265,26 +262,31 @@ Authorization rules control whether users can read, write, or execute operations
 
 ```csharp
 using Csla.Rules;
+using System.Security.Claims;
 
-public class IsInRole : AuthorizationRule
+public class HasClaim : AuthorizationRule
 {
-    private string _role;
+    private string _claimType;
+    private string _claimValue;
     
-    public IsInRole(AuthorizationActions action, string role)
+    public HasClaim(AuthorizationActions action, string claimType, string claimValue)
         : base(action)
     {
-        _role = role;
+        _claimType = claimType;
+        _claimValue = claimValue;
     }
     
-    public IsInRole(AuthorizationActions action, IPropertyInfo property, string role)
+    public HasClaim(AuthorizationActions action, IPropertyInfo property, string claimType, string claimValue)
         : base(action, property)
     {
-        _role = role;
+        _claimType = claimType;
+        _claimValue = claimValue;
     }
     
     protected override void Execute(IAuthorizationContext context)
     {
-        if (!ApplicationContext.User.IsInRole(_role))
+        var principal = ApplicationContext.Principal as ClaimsPrincipal;
+        if (principal == null || !principal.HasClaim(_claimType, _claimValue))
         {
             context.HasPermission = false;
         }
@@ -300,9 +302,9 @@ public partial class SensitiveData : BusinessBase<SensitiveData>
         base.AddBusinessRules();
         
         // Object-level authorization
-        BusinessRules.AddRule(new IsInRole(AuthorizationActions.ReadProperty, "Manager"));
-        BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, "Administrator"));
-        BusinessRules.AddRule(new IsInRole(AuthorizationActions.DeleteObject, "Administrator"));
+        BusinessRules.AddRule(new HasClaim(AuthorizationActions.ReadProperty, "Department", "Management"));
+        BusinessRules.AddRule(new HasClaim(AuthorizationActions.WriteProperty, ClaimTypes.Role, "Administrator"));
+        BusinessRules.AddRule(new HasClaim(AuthorizationActions.DeleteObject, ClaimTypes.Role, "Administrator"));
     }
 }
 
@@ -319,11 +321,11 @@ public partial class Employee : BusinessBase<Employee>
         
         // Anyone can read/write name
         
-        // Only managers can read salary
-        BusinessRules.AddRule(new IsInRole(AuthorizationActions.ReadProperty, SalaryProperty, "Manager"));
+        // Only users with Department=Management claim can read salary
+        BusinessRules.AddRule(new HasClaim(AuthorizationActions.ReadProperty, SalaryProperty, "Department", "Management"));
         
-        // Only HR can write salary
-        BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, SalaryProperty, "HR"));
+        // Only users with Role=HR claim can write salary
+        BusinessRules.AddRule(new HasClaim(AuthorizationActions.WriteProperty, SalaryProperty, ClaimTypes.Role, "HR"));
     }
 }
 ```
@@ -341,8 +343,39 @@ AuthorizationActions.DeleteObject
 AuthorizationActions.ReadProperty
 AuthorizationActions.WriteProperty
 
-// Command execution
+// Method execution
 AuthorizationActions.ExecuteMethod
+```
+
+### Method Authorization
+
+You can control authorization for specific methods on your business objects:
+
+```csharp
+[CslaImplementProperties]
+public partial class Calculator : BusinessBase<Calculator>
+{
+    public static MethodInfo DoCalcMethod = RegisterMethod(c => c.DoCalc());
+    
+    /// <summary>
+    /// Performs a calculation. Only authorized users can execute this method.
+    /// </summary>
+    public void DoCalc()
+    {
+        // Check authorization
+        CanExecuteMethod(DoCalcMethod, true);
+        
+        // Implementation of method goes here
+    }
+    
+    protected override void AddBusinessRules()
+    {
+        base.AddBusinessRules();
+        
+        // Only users in Role1 or Role2 can execute DoCalc
+        BusinessRules.AddRule(new IsInRole(AuthorizationActions.ExecuteMethod, DoCalcMethod, "Role1", "Role2"));
+    }
+}
 ```
 
 ### Built-In Authorization Rules
@@ -361,6 +394,10 @@ protected override void AddBusinessRules()
     
     // User must NOT be in this role
     BusinessRules.AddRule(new IsNotInRole(AuthorizationActions.DeleteObject, "Guest"));
+    
+    // Object-level authorization by role
+    BusinessRules.AddRule(new IsInRole(AuthorizationActions.EditObject, "Manager", "Administrator"));
+    BusinessRules.AddRule(new IsNotInRole(AuthorizationActions.DeleteObject, "Guest", "User"));
 }
 ```
 
@@ -468,6 +505,8 @@ protected override void AddBusinessRules()
 }
 ```
 
+> **Note:** Async rules do not honor priorities. They run asynchronously and potentially in parallel, resulting in non-deterministic completion order. Only synchronous rules execute in priority order.
+
 ## Rule Severity Levels
 
 Rules can have different severity levels:
@@ -497,15 +536,36 @@ protected override void Execute(IRuleContext context)
 
 ## Short-Circuiting Rules
 
-Stop rule processing if a condition isn't met:
+You can create rules that stop further rule processing based on conditions. Here's an example of a custom rule that stops validation if the user can't write to a property:
 
 ```csharp
+public class StopIfNotCanWrite : BusinessRule
+{
+    public StopIfNotCanWrite(IPropertyInfo primaryProperty)
+        : base(primaryProperty)
+    {
+        InputProperties = new List<IPropertyInfo> { primaryProperty };
+    }
+    
+    protected override void Execute(IRuleContext context)
+    {
+        var canWrite = CanWriteProperty(PrimaryProperty);
+        if (!canWrite)
+        {
+            context.AddSuccessResult(true); // Stop processing subsequent rules
+        }
+    }
+}
+
+// Usage
 protected override void AddBusinessRules()
 {
     base.AddBusinessRules();
     
+    // Check if user can write (authorization rules don't use Priority)
+    BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, NameProperty, "User"));
+    
     // If user can't write, don't run other validation rules
-    BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, NameProperty, "User") { Priority = -1 });
     BusinessRules.AddRule(new StopIfNotCanWrite(NameProperty) { Priority = 0 });
     
     // These only run if user has write permission
@@ -554,22 +614,108 @@ public partial class Customer : BusinessBase<Customer>
 
 ### Conditional Rules
 
-Rules that only apply under certain conditions:
+Business rules (validation, calculation) that only apply under certain conditions can use self-contained conditional logic or rule delegation. Note that authorization rules should always be self-contained and cannot use delegation patterns.
+
+#### Self-Contained Conditional Logic
+
+The rule itself contains the logic to determine when it should apply:
 
 ```csharp
+public class RequiredIfNew : BusinessRule
+{
+    public RequiredIfNew(IPropertyInfo primaryProperty)
+        : base(primaryProperty)
+    {
+        InputProperties = new List<IPropertyInfo> { primaryProperty };
+    }
+    
+    protected override void Execute(IRuleContext context)
+    {
+        var target = (BusinessBase)context.Target;
+        if (!target.IsNew)
+        {
+            return; // Don't validate if not new
+        }
+        
+        var value = context.InputPropertyValues[PrimaryProperty];
+        if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
+        {
+            context.AddErrorResult("Password is required for new objects");
+        }
+    }
+}
+
+// Usage
+protected override void AddBusinessRules()
+{
+    base.AddBusinessRules();
+    BusinessRules.AddRule(new RequiredIfNew(PasswordProperty));
+}
+```
+
+#### Rule Delegation Approach
+
+```csharp
+public class ConditionalRule : BusinessRule
+{
+    private IBusinessRule _innerRule;
+    private Func<IRuleContext, bool> _condition;
+    
+    public ConditionalRule(IBusinessRule innerRule, Func<IRuleContext, bool> condition)
+        : base(innerRule.PrimaryProperty)
+    {
+        _innerRule = innerRule;
+        _condition = condition;
+        InputProperties = innerRule.InputProperties;
+        AffectedProperties = innerRule.AffectedProperties;
+    }
+    
+    protected override void Execute(IRuleContext context)
+    {
+        if (_condition(context))
+        {
+            // Delegate to the inner rule if condition is met
+            _innerRule.Execute(context);
+        }
+    }
+}
+
+// Usage
 protected override void AddBusinessRules()
 {
     base.AddBusinessRules();
     
-    if (IsNew)
+    // Only require password for new objects
+    var passwordRule = new Required(PasswordProperty);
+    BusinessRules.AddRule(new ConditionalRule(passwordRule, ctx => ((BusinessBase)ctx.Target).IsNew));
+}
+```
+
+#### Conditional Authorization Rules
+
+Authorization rules should be self-contained and include their own conditional logic:
+
+```csharp
+public class AdminOnlyForSensitiveData : AuthorizationRule
+{
+    public AdminOnlyForSensitiveData(AuthorizationActions action, IPropertyInfo property)
+        : base(action, property)
     {
-        BusinessRules.AddRule(new Required(PasswordProperty));
     }
     
-    if (ApplicationContext.User.IsInRole("Administrator"))
+    protected override void Execute(IAuthorizationContext context)
     {
-        // Admins have additional validation
-        BusinessRules.AddRule(new CustomAdminValidation(SomeProperty));
+        var target = (BusinessBase)context.Target;
+        
+        // Only enforce this authorization rule for sensitive data
+        if (target.IsSensitive) // Assuming IsSensitive is a property on the business object
+        {
+            if (!ApplicationContext.User.IsInRole("Administrator"))
+            {
+                context.HasPermission = false;
+            }
+        }
+        // If not sensitive, permission is granted by default
     }
 }
 ```
