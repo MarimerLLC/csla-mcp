@@ -1,19 +1,29 @@
 # Editable Root Stereotype
 
-This example demonstrates a complete CSLA business class named `CustomerEdit` that includes various property types, business rules, authorization rules, and data access methods. The class derives from `BusinessBase<T>` and includes both read-only and read-write properties.
+The Editable Root stereotype represents a business object that can exist independently and be directly created, retrieved, updated, or deleted through the data portal. It is the most common CSLA stereotype for editable business entities.
 
-This class demonstrates the editable root business class stereotype.
+**Key Characteristics**:
 
-It also shows how to implement business rules for validation, including required fields, string length constraints, and a custom rule to ensure email uniqueness. Additionally, it includes object-level authorization rules to control access based on user roles.
+* Can exist independently (not contained in a parent)
+* Supports full CRUD operations through root data portal
+* Derives from `BusinessBase<T>`
+* Supports business rules, validation, and authorization
+* Can contain child objects
+* Saved using `Save()` or `SaveAndMerge()` methods
 
-It also includes data portal operation methods for creating, fetching, inserting, updating, and deleting customer records. Note that the data access methods contain placeholder comments where actual data access logic should be invoked.
+**Common use cases**: Customer, Order, Invoice, Product, Employee - any top-level business entity.
+
+## Implementation Example
+
+This example demonstrates a customer editable root object with properties, business rules, and data portal operations.
 
 ```csharp
 using System;
 using System.ComponentModel.DataAnnotations;
+using System.Threading.Tasks;
 using Csla;
 
-namespace CslaExamples
+namespace MyApp.Business
 {
     [Serializable]
     public class CustomerEdit : BusinessBase<CustomerEdit>
@@ -59,122 +69,101 @@ namespace CslaExamples
 
         protected override void AddBusinessRules()
         {
-            // Call base first
             base.AddBusinessRules();
-
-            // Add custom business rules
-            BusinessRules.AddRule(new Rules.CommonRules.Required(NameProperty));
-            BusinessRules.AddRule(new Rules.CommonRules.MaxLength(NameProperty, 50));
-            BusinessRules.AddRule(new Rules.CommonRules.MinLength(NameProperty, 2));
-            
-            BusinessRules.AddRule(new Rules.CommonRules.Required(EmailProperty));
-            BusinessRules.AddRule(new Rules.CommonRules.RegEx(EmailProperty, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"));
 
             // Custom rule example
             BusinessRules.AddRule(new EmailUniqueRule(EmailProperty));
 
-            // Dependency rules
+            // Dependency: when Name changes, recheck Email rules
             BusinessRules.AddRule(new Rules.CommonRules.Dependency(NameProperty, EmailProperty));
         }
 
         [ObjectAuthorizationRules]
         public static void AddObjectAuthorizationRules()
         {
-            // Example authorization rules
-            BusinessRules.AddRule(typeof(Customer), new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.CreateObject, "Admin", "Manager"));
-            BusinessRules.AddRule(typeof(Customer), new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
-            BusinessRules.AddRule(typeof(Customer), new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.DeleteObject, "Admin"));
+            BusinessRules.AddRule(typeof(CustomerEdit), 
+                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.CreateObject, "Admin", "Manager"));
+            BusinessRules.AddRule(typeof(CustomerEdit), 
+                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
+            BusinessRules.AddRule(typeof(CustomerEdit), 
+                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.DeleteObject, "Admin"));
         }
 
         [Create]
-        private async Task Create([Inject] ICustomerDal customerDal)
+        private async Task Create([Inject] ICustomerDal dal)
         {
-            // Call DAL Create method to get default values
-            var customerData = await customerDal.Create();
+            // Get default values from DAL
+            var data = await dal.CreateAsync();
             
-            // Load default values from DAL
-            LoadProperty(CreatedDateProperty, customerData.CreatedDate);
-            LoadProperty(IsActiveProperty, customerData.IsActive);
+            LoadProperty(CreatedDateProperty, data.CreatedDate);
+            LoadProperty(IsActiveProperty, data.IsActive);
             
-            BusinessRules.CheckRules();
+            await BusinessRules.CheckRulesAsync();
         }
 
         [Fetch]
-        private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+        private async Task Fetch(int id, [Inject] ICustomerDal dal)
         {
-            // Get data from DAL
-            var customerData = await customerDal.Get(id);
+            var data = await dal.GetAsync(id);
             
-            // Load properties from DAL data
-            if (customerData != null)
-            {
-                LoadProperty(IdProperty, customerData.Id);
-                LoadProperty(NameProperty, customerData.Name);
-                LoadProperty(EmailProperty, customerData.Email);
-                LoadProperty(CreatedDateProperty, customerData.CreatedDate);
-                LoadProperty(IsActiveProperty, customerData.IsActive);
-            }
-            else
-            {
-                throw new ArgumentException($"Customer {id} not found");
-            }
+            if (data == null)
+                throw new DataNotFoundException($"Customer {id} not found");
+            
+            LoadProperty(IdProperty, data.Id);
+            LoadProperty(NameProperty, data.Name);
+            LoadProperty(EmailProperty, data.Email);
+            LoadProperty(CreatedDateProperty, data.CreatedDate);
+            LoadProperty(IsActiveProperty, data.IsActive);
 
-            BusinessRules.CheckRules();
-        }
-
-        private static CustomerData CreateCustomerData(Customer customer)
-        {
-            return new CustomerData
-            {
-                Id = customer.ReadProperty(IdProperty),
-                Name = customer.ReadProperty(NameProperty),
-                Email = customer.ReadProperty(EmailProperty),
-                CreatedDate = customer.ReadProperty(CreatedDateProperty),
-                IsActive = customer.ReadProperty(IsActiveProperty)
-            };
+            await BusinessRules.CheckRulesAsync();
         }
 
         [Insert]
-        private async Task Insert([Inject] ICustomerDal customerDal)
+        private async Task Insert([Inject] ICustomerDal dal)
         {
-            // Prepare customerData with current property values
-            var customerData = CreateCustomerData(this);
+            var data = new CustomerData
+            {
+                Name = ReadProperty(NameProperty),
+                Email = ReadProperty(EmailProperty),
+                CreatedDate = ReadProperty(CreatedDateProperty),
+                IsActive = ReadProperty(IsActiveProperty)
+            };
             
-            // Call DAL Upsert method for insert and get result with new ID
-            var result = await customerDal.Upsert(customerData);
+            var result = await dal.InsertAsync(data);
             
-            // Load the new ID from the result
             LoadProperty(IdProperty, result.Id);
             LoadProperty(CreatedDateProperty, result.CreatedDate);
         }
 
         [Update]
-        private async Task Update([Inject] ICustomerDal customerDal)
+        private async Task Update([Inject] ICustomerDal dal)
         {
-            // Prepare customerData with current property values
-            var customerData = CreateCustomerData(this);
+            var data = new CustomerData
+            {
+                Id = ReadProperty(IdProperty),
+                Name = ReadProperty(NameProperty),
+                Email = ReadProperty(EmailProperty),
+                CreatedDate = ReadProperty(CreatedDateProperty),
+                IsActive = ReadProperty(IsActiveProperty)
+            };
             
-            // Call DAL Upsert method for update
-            await customerDal.Upsert(customerData);
+            await dal.UpdateAsync(data);
         }
 
         [DeleteSelf]
-        private async Task DeleteSelf([Inject] ICustomerDal customerDal)
+        private async Task DeleteSelf([Inject] ICustomerDal dal)
         {
-            // Call DAL Delete method
-            await customerDal.Delete(ReadProperty(IdProperty));
-            
-            // Mark as new
+            await dal.DeleteAsync(ReadProperty(IdProperty));
             MarkNew();
         }
 
         [Delete]
-        private async Task Delete(int id, [Inject] ICustomerDal customerDal)
+        private async Task Delete(int id, [Inject] ICustomerDal dal)
         {
-            // Call DAL Delete method
-            await customerDal.Delete(id);
+            await dal.DeleteAsync(id);
         }
 
+        // Custom business rule example
         private class EmailUniqueRule : Rules.BusinessRule
         {
             public EmailUniqueRule(Core.IPropertyInfo primaryProperty)
@@ -189,7 +178,6 @@ namespace CslaExamples
 
                 if (!string.IsNullOrEmpty(email))
                 {
-                    // Simulate checking for unique email
                     // In real implementation, this would check against database
                     if (email.ToLower() == "duplicate@example.com")
                     {
@@ -201,3 +189,78 @@ namespace CslaExamples
     }
 }
 ```
+
+## Using the Editable Root
+
+### Creating a New Instance
+
+```csharp
+// Inject IDataPortal<CustomerEdit> via dependency injection
+var customer = await customerPortal.CreateAsync();
+customer.Name = "John Doe";
+customer.Email = "john@example.com";
+```
+
+### Fetching an Existing Instance
+
+```csharp
+var customer = await customerPortal.FetchAsync(customerId);
+customer.Name = "Jane Doe";
+```
+
+### Saving Changes
+
+```csharp
+// Option 1: SaveAndMerge - continue using same reference
+await customer.SaveAndMergeAsync();
+// customer reference is still valid
+
+// Option 2: Save - get new reference
+customer = await customer.SaveAsync();
+// must use returned reference
+```
+
+### Deleting
+
+```csharp
+// Option 1: Fetch then delete (uses DeleteSelf)
+var customer = await customerPortal.FetchAsync(customerId);
+customer.Delete();
+await customer.SaveAsync();
+
+// Option 2: Delete without fetching (uses Delete)
+await customerPortal.DeleteAsync(customerId);
+```
+
+## Key Concepts
+
+### Data Annotations
+
+CSLA automatically converts data annotations into business rules. Use them for common validation:
+
+* `[Required]` - Property must have a value
+* `[StringLength]` - String length constraints
+* `[Range]` - Numeric range validation
+* `[EmailAddress]` - Email format validation
+* `[Display]` - Friendly name (supports localization)
+
+### Custom Business Rules
+
+For validation that can't be expressed with data annotations, create custom rules by deriving from `Rules.BusinessRule`. See the `EmailUniqueRule` example above.
+
+### Authorization Rules
+
+Object-level authorization controls who can create, fetch, edit, or delete the entire object. Define these in a static method with `[ObjectAuthorizationRules]` attribute.
+
+### Data Portal Operations
+
+* `[Create]` - Initialize new instance with default values
+* `[Fetch]` - Retrieve existing instance by criteria
+* `[Insert]` - Save new instance to database
+* `[Update]` - Update existing instance in database
+* `[DeleteSelf]` - Delete this instance (after fetching)
+* `[Delete]` - Delete by criteria (without fetching)
+
+### Root Objects with Children
+
+If your root object contains child objects, see `EditableChild.md` for details on managing child object lifecycles. The root manages its children through `IChildDataPortal<T>` and `FieldManager.UpdateChildrenAsync()`.
