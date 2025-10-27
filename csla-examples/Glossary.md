@@ -27,6 +27,8 @@ CSLA uses attributes to mark classes, methods, and properties for specific behav
 | `[CslaImplementProperties]` | Enables automatic code generation for partial properties | Place on a partial class containing partial property declarations - requires a reference to the `Csla.Generator.AutoImplementProperties.CSharp` package |
 | `[ObjectAuthorizationRules]` | Marks a static method that defines object-level authorization rules | Place on a static method like `AddObjectAuthorizationRules()` |
 
+> **Note**: The `[Serializable]` attribute is no longer required or recommended in CSLA 9 and later. CSLA uses its own serialization mechanism and does not require classes to be marked with this attribute.
+
 ### Data Portal Operation Attributes
 
 These attributes mark methods that implement data portal operations. Methods are typically private and can be sync or async.
@@ -247,7 +249,7 @@ Added in `AddBusinessRules()` method. Controls access to specific properties.
 
 **Authorization actions**: `ReadProperty`, `WriteProperty`, `ExecuteMethod`
 
-Example: `BusinessRules.AddRule(new Rules.CommonRules.IsInRole(AuthorizationActions.WriteProperty, SalaryProperty, "Admin, HR"));`
+Example: `BusinessRules.AddRule(new Rules.CommonRules.IsInRole(AuthorizationActions.WriteProperty, SalaryProperty, "Admin", "HR"));`
 
 ### Rule Checking
 

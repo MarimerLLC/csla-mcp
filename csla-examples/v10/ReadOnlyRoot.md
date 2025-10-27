@@ -1,57 +1,141 @@
-# ReadOnly Root Stereotype
+# Read-Only Root Stereotype
 
-This example demonstrates a complete CSLA business class named `CustomerInfo` that includes various property types, authorization rules, and data access methods. The class derives from `ReadOnlyBase<T>` and includes only read-only properties.
+The Read-Only Root stereotype represents an immutable business object that can be fetched but not modified. It's used for displaying data that users can view but not edit.
 
-This class demonstrates the read-only root business class stereotype.
+**Key Characteristics**:
 
-It also shows how to implement property and object-level authorization rules to control access based on user roles.
+* Can exist independently (not contained in a parent)
+* Derives from `ReadOnlyBase<T>`
+* All properties are read-only (private set)
+* Only supports Fetch operation (no Create, Insert, Update, Delete)
+* Supports authorization rules
+* Often used for reports, lookups, and display-only data
 
-It also includes a data portal operation method for fetching customer records. Note that the data access method contains a placeholder comment where actual data access logic should be invoked.
+**Common use cases**: Product catalog display, customer information lookup, report data, historical records.
+
+## Implementation Example
+
+This example demonstrates a read-only customer information object.
 
 ```csharp
 using System;
+using System.Threading.Tasks;
 using Csla;
-using Csla.Rules;
-using Csla.Rules.CommonRules;
 
-[CslaImplementProperties]
-public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
+namespace MyApp.Business
 {
-    public partial int Id { get; private set; }
-    public partial string Name { get; private set; }
-    public partial string Email { get; private set; }
-    public partial DateTime CreatedDate { get; private set; }
-    public partial bool IsActive { get; private set; }
-
-    protected override void AddBusinessRules()
+    [CslaImplementProperties]
+    public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
     {
-        base.AddBusinessRules();
-        // Example: Only users in the "Admin" role can view the Name property
-        BusinessRules.AddRule(new IsInRole(NameProperty, "Admin"));
-    }
+        public partial int Id { get; private set; }
+        public partial string Name { get; private set; }
+        public partial string Email { get; private set; }
+        public partial DateTime CreatedDate { get; private set; }
+        public partial bool IsActive { get; private set; }
 
-    protected override void AddAuthorizationRules()
-    {
-        base.AddAuthorizationRules();
-        // Example: Only users in the "Admin" role can read this object
-        AuthorizationRules.AllowRead(typeof(CustomerInfo), "Admin");
-    }
-
-    private async Task DataPortal_Fetch(int id, [Inject] ICustomerDal customerDal)
-    {
-        var customerData = await customerDal.Get(id);
-        if (customerData != null)
+        protected override void AddBusinessRules()
         {
-            LoadProperty(IdProperty, customerData.Id);
-            LoadProperty(NameProperty, customerData.Name);
-            LoadProperty(EmailProperty, customerData.Email);
-            LoadProperty(CreatedDateProperty, customerData.CreatedDate);
-            LoadProperty(IsActiveProperty, customerData.IsActive);
+            base.AddBusinessRules();
+            
+            // Property-level authorization: only Admin can view Email
+            BusinessRules.AddRule(
+                new Rules.CommonRules.IsInRole(
+                    Rules.AuthorizationActions.ReadProperty,
+                    EmailProperty,
+                    "Admin"));
         }
-        else
+
+        [ObjectAuthorizationRules]
+        public static void AddObjectAuthorizationRules()
         {
-            throw new ArgumentException($"Customer {id} not found");
+            // Object-level authorization
+            BusinessRules.AddRule(typeof(CustomerInfo),
+                new Rules.CommonRules.IsInRole(
+                    Rules.AuthorizationActions.GetObject,
+                    "Admin", "Manager", "User"));
+        }
+
+        [Fetch]
+        private async Task Fetch(int id, [Inject] ICustomerDal dal)
+        {
+            var data = await dal.GetAsync(id);
+            
+            if (data == null)
+                throw new DataNotFoundException($"Customer {id} not found");
+            
+            LoadProperty(IdProperty, data.Id);
+            LoadProperty(NameProperty, data.Name);
+            LoadProperty(EmailProperty, data.Email);
+            LoadProperty(CreatedDateProperty, data.CreatedDate);
+            LoadProperty(IsActiveProperty, data.IsActive);
         }
     }
 }
 ```
+
+## Using the Read-Only Root
+
+### Fetching an Instance
+
+```csharp
+// Inject IDataPortal<CustomerInfo> via dependency injection
+var customer = await customerInfoPortal.FetchAsync(customerId);
+
+// Display in UI
+lblName.Text = customer.Name;
+lblEmail.Text = customer.Email;
+```
+
+### Read-Only Properties
+
+All properties are read-only. Attempting to set a value will result in a compile error:
+
+```csharp
+var customer = await customerInfoPortal.FetchAsync(customerId);
+// customer.Name = "New Name"; // Compile error - property is read-only
+```
+
+## Key Concepts
+
+### When to Use Read-Only Root
+
+**Use Read-Only Root when**:
+
+* Data is for display only
+* Users should not be able to modify the data
+* Data comes from queries or views optimized for reading
+* Implementing reports or read-only grids
+
+**Use Editable Root when**:
+
+* Users need to modify the data
+* Data needs to be created, updated, or deleted
+
+See `EditableRoot.md` for editable objects.
+
+### Authorization
+
+**Object-level authorization**: Controls who can fetch the object (defined with `[ObjectAuthorizationRules]`)
+
+**Property-level authorization**: Controls who can read specific properties (defined in `AddBusinessRules()`)
+
+### Data Portal Operations
+
+Read-only roots only support:
+
+* `[Fetch]` - Retrieve instance from database
+
+No Create, Insert, Update, Delete, or DeleteSelf operations.
+
+### Performance
+
+Read-only objects are lighter weight than editable objects:
+
+* No change tracking
+* No n-level undo
+* No dirty state management
+* Optimized for display scenarios
+
+### Read-Only Objects with Children
+
+Read-only roots can contain read-only child objects or lists. See `ReadOnlyChild.md` and `ReadOnlyChildList.md` for details.

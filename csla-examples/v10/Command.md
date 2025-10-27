@@ -1,39 +1,107 @@
 # Command Stereotype
 
-This example demonstrates a complete CSLA business class named `CustomerExists` that includes various property types and data access methods. The class derives from `CommandBase<T>` and includes properties for input parameters and output results.
+The Command stereotype is used for operations that don't fit the standard CRUD pattern. Commands encapsulate server-side operations like calculations, validations, or actions that don't involve managing object state.
 
-This class demonstrates the command business class stereotype.
+**Common use cases**:
 
-It also includes a data portal operation method for executing the command. Note that the data access method contains a placeholder comment where actual data access logic should be invoked.
+* Check if a record exists
+* Perform calculations
+* Execute business operations (e.g., ship order, archive invoice)
+* Validate data without creating/fetching a full object
+
+## Key Characteristics
+
+* Derives from `CommandBase<T>`
+* Uses `[Execute]` data portal operation
+* Properties hold input parameters and output results
+* Does not support business rules or n-level undo
+* Lightweight - designed for simple operations
+
+## Implementation Example
+
+This example demonstrates a command that checks if a customer exists by email address.
 
 ```csharp
 using System;
+using System.Threading.Tasks;
 using Csla;
 
-[CslaImplementProperties]
-public partial class CustomerExists : CommandBase<CustomerExists>
+namespace MyApp.Business
 {
-    public partial bool Exists { get; set; }
-
-    [Execute]
-    private async Task Execute(string email, [Inject] ICustomerDal dal)
+    [CslaImplementProperties]
+    public partial class CustomerExists : CommandBase<CustomerExists>
     {
-        // Placeholder for actual data access logic
-        var customer = await dal.GetByEmailAsync(email);
-        Exists = customer != null;
+        // Output result
+        public partial bool Exists { get; private set; }
+
+        [Execute]
+        private async Task Execute(string email, [Inject] ICustomerDal dal)
+        {
+            var customer = await dal.GetByEmailAsync(email);
+            LoadProperty(ExistsProperty, customer != null);
+        }
     }
 }
 ```
 
-> **Note:** The `ICustomerDal` interface is assumed to be defined elsewhere in your codebase and is responsible for data access operations related to customers. The `GetByEmailAsync` method is a placeholder for the actual implementation that retrieves a customer by their email address.
+> **Note:** Commands use `LoadProperty` to set property values since they don't have property setters in the traditional sense. The `CommandBase` class does not support business rules.
 
-This class can be used to check if a customer with a specific email address exists in the data store by setting the `Email` property and then calling the data portal to execute the command. The result will be available in the `Exists` property.
+## Execution Pattern
 
-To execute this command, you would typically do something like the following:
+### Execute and Evaluate (Recommended)
+
+Pass input parameters directly to `ExecuteAsync`:
 
 ```csharp
+// Inject IDataPortal<CustomerExists> via dependency injection
 var command = await customerExistsPortal.ExecuteAsync("customer@example.com");
 bool customerExists = command.Exists;
 ```
 
-This assumes `customerExistsPortal` is a service of type `IDataPortal<CustomerExists>`.
+This is the modern, recommended approach where the command is created and executed in one call.
+
+### Create, Load, Execute, Evaluate (Alternative)
+
+For scenarios where you need to set multiple input properties before execution:
+
+```csharp
+[CslaImplementProperties]
+public partial class ProcessOrder : CommandBase<ProcessOrder>
+{
+    // Input properties
+    public partial int OrderId { get; set; }
+    public partial DateTime ShipDate { get; set; }
+    
+    // Output property
+    public partial string TrackingNumber { get; private set; }
+
+    [Execute]
+    private async Task Execute([Inject] IOrderDal dal)
+    {
+        var tracking = await dal.ShipOrderAsync(
+            ReadProperty(OrderIdProperty), 
+            ReadProperty(ShipDateProperty));
+        LoadProperty(TrackingNumberProperty, tracking);
+    }
+}
+```
+
+Usage:
+
+```csharp
+var command = await processOrderPortal.CreateAsync();
+command.OrderId = 12345;
+command.ShipDate = DateTime.Today;
+command = await processOrderPortal.ExecuteAsync(command);
+string tracking = command.TrackingNumber;
+```
+
+## Property Access in Commands
+
+* Use `LoadProperty()` to set output values in the `Execute` method
+* Use `ReadProperty()` to read input values in the `Execute` method
+* Properties can be read-write (inputs) or read-only with private setter (outputs)
+
+## Dependency Injection
+
+Use `[Inject]` attribute to inject DAL interfaces or services into the `Execute` method. Registration happens in the application startup configuration.
