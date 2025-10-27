@@ -1,8 +1,10 @@
-# CSLA .NET Version 10 Glossary of Terms
+# CSLA .NET Glossary of Terms
 
-This is a gloassary or index of terms that are commonly used in the CSLA .NET environment. They are a type of jargon.
+This glossary defines terms and concepts commonly used in CSLA .NET development. It is optimized for AI assistants helping developers write CSLA code.
 
-In most cases, these terms and related concepts are more fully documented in other files available using the `search` tool. Detailed documents often also include code examples for supported versions of CSLA .NET.
+**Version Focus**: This document primarily covers CSLA .NET version 10, which uses code generation via `[CslaImplementProperties]`. Version 9 examples exist in `v9/` subdirectory for reference.
+
+**Related Documents**: Detailed implementation examples with full code snippets exist for stereotypes (e.g., `EditableRoot.md`), properties (`Properties.md`), data access patterns (`Data-Access.md`), and each data portal operation (e.g., `DataPortalOperationFetch.md`).
 
 ## Architecture
 
@@ -13,6 +15,38 @@ CSLA is designed around the concept that each application has the following logi
 * Business logic (business domain types created using CSLA base classes and stereotypes)
 * Data access (code that interacts with the data store(s) such as databases, files, or other storage mediums; often implemented with ADO.NET or Entity Framework)
 * Data storage (databases, files, spreadsheets, service APIs, or other locations where data might be retrieved and saved)
+
+## CSLA Attributes
+
+CSLA uses attributes to mark classes, methods, and properties for specific behaviors.
+
+### Class-level Attributes
+
+| Attribute | Purpose | Usage |
+| --- | --- | --- |
+| `[CslaImplementProperties]` | Enables automatic code generation for partial properties | Place on a partial class containing partial property declarations - requires a reference to the `Csla.Generator.AutoImplementProperties.CSharp` package |
+| `[ObjectAuthorizationRules]` | Marks a static method that defines object-level authorization rules | Place on a static method like `AddObjectAuthorizationRules()` |
+
+### Data Portal Operation Attributes
+
+These attributes mark methods that implement data portal operations. Methods are typically private and can be sync or async.
+
+| Attribute | Operation Type | Used In | Detailed Doc |
+| --- | --- | --- | --- |
+| `[Create]` | Initialize a new object with default values | Root and child objects | `DataPortalOperationCreate.md` |
+| `[Fetch]` | Retrieve an existing object from data store | Root and child objects | `DataPortalOperationFetch.md` |
+| `[Insert]` | Save a new object to the data store | Root and child objects | `DataPortalOperationInsert.md` |
+| `[Update]` | Update an existing object in the data store | Root and child objects | `DataPortalOperationUpdate.md` |
+| `[Delete]` | Delete an object by criteria without fetching it first | Root objects only | `DataPortalOperationDelete.md` |
+| `[DeleteSelf]` | Delete the current object instance | Root and child objects | `DataPortalOperationDelete.md` |
+| `[Execute]` | Execute a command operation | Command objects only | `DataPortalOperationExecute.md` |
+
+### Other Method/Property Attributes
+
+| Attribute | Purpose | Usage |
+| --- | --- | --- |
+| `[Inject]` | Marks a method parameter for dependency injection | Use on DAL or service parameters in data portal methods |
+| `[CslaIgnoreProperty]` | Excludes a property automatic code generation with the `CslaImplementProperties` behavior | Place on properties that should not be managed by CSLA |
 
 ## Stereotypes
 
@@ -102,7 +136,7 @@ To use the child data portal, calling code needs to use dependency injection to 
 | UpdateChild | Updates the data in the child object into the data store by invoking the data access layer |
 | DeleteSelfChild | Uses the data access layer to delete the data represented by the child object |
 
-### Ineracting with the data access layer
+### Interacting with the data access layer
 
 There are four models that can be used to interact with the data access layer. These are listed in order of recommendation, so the last option is the least desirable.
 
@@ -114,3 +148,131 @@ There are four models that can be used to interact with the data access layer. T
 | Encapsulated implementation |  Data portal operation method is in the business class and it directly implements data access code to get or modify data; the data access layer is embedded in the business class |
 
 _Encapsulated invocation_ is the best model for most application scenarios.
+
+## Property Conventions
+
+Property declarations are covered in the version-specific `Properties.md` file (for example `v10/Properties.md`), and they vary from CSLA 9 to CSLA 10.
+
+The common way to declare a property is similar to this:
+
+```csharp
+    public static readonly PropertyInfo<string> NameProperty = RegisterProperty<string>(nameof(Name));
+    public string Name
+    {
+        get => GetProperty(NameProperty);
+        set => SetProperty(NameProperty, value);
+    }
+```
+
+There is a simpler way to do this in CSLA 10 and later.
+
+Also, there are differences between read-write and read-only properties, and how properties are declared in editable, read-only, and command stereotypes. All this is covered in more specific documentation files.
+
+### Property Backing Fields
+
+Each property has a corresponding `PropertyInfo<T>` field with "Property" suffix:
+
+For example, a `Name` property will have a `NameProperty` field with information about the property. Many other CSLA methods rely on this corresponding field.
+
+### Property Access Methods
+
+| Method | Purpose | When to Use |
+| --- | --- | --- |
+| `LoadProperty(propertyInfo, value)` | Sets a property value internally, bypassing validation and change tracking | In data portal operations when loading data from DAL |
+| `ReadProperty(propertyInfo)` | Gets a property value internally | In data portal operations when reading values to send to DAL |
+| `GetProperty(propertyInfo)` | Gets a property value (used in property getters) | In manually-implemented property getters (CSLA 9 style) |
+| `SetProperty(propertyInfo, value)` | Sets a property value, triggering validation and change tracking | In manually-implemented property setters (CSLA 9 style) |
+
+### Using BypassPropertyChecks
+
+Alternative approach to `LoadProperty` for setting multiple properties:
+
+```csharp
+using (BypassPropertyChecks)
+{
+    Id = customerData.Id;
+    Name = customerData.Name;
+    Email = customerData.Email;
+}
+```
+
+## Object State Management
+
+### Object Metastate
+
+CSLA tracks object metastate for various reasons.
+
+| State | Description | Methods to Check |
+| --- | --- | --- |
+| Busy | Object is running one or more async business rules | `IsBusy` property |
+| New | Object is new and needs to be inserted | `IsNew` property |
+| Clean | Object exists and has no changes | `!IsDirty` |
+| Dirty | Object has unsaved changes | `IsDirty` property |
+| Deleted | Object is marked for deletion | `IsDeleted` property |
+| Valid | Object passes all business rules | `IsValid` property |
+| Savable | Object can be saved (dirty and valid, or deleted) | `IsSavable` property |
+
+### Metastate Manipulation Methods
+
+| Method | Purpose | When to Use |
+| --- | --- | --- |
+| `MarkDeleted()` | Marks object for deletion | In business methods that soft-delete |
+| `MarkNew()` | Marks object as new | Rarely needed; data portal handles this |
+| `MarkClean()` | Marks object as unchanged | Rarely needed; data portal handles this |
+| `MarkOld()` | Marks object as existing (not new) | Rarely needed; data portal handles this |
+
+## Business and Authorization Rules
+
+### Business Rules
+
+Business rules provide validation and calculation logic. Added in the `AddBusinessRules()` override method using `BusinessRules.AddRule()`.
+
+**Common rule types**: `Required`, `MaxLength`, `MinLength`, `Range`, `RegEx`, `Dependency`
+
+**Data Annotations**: CSLA automatically converts standard data annotations (`[Required]`, `[StringLength]`, `[EmailAddress]`, etc.) into business rules.
+
+### Authorization Rules
+
+Authorization rules control who can perform operations on objects and properties using `Rules.CommonRules.IsInRole`.
+
+#### Object-Level Authorization
+
+Defined in a static method with `[ObjectAuthorizationRules]` attribute. Controls entire object access.
+
+**Authorization actions**: `CreateObject`, `GetObject`, `EditObject`, `DeleteObject`
+
+#### Property-Level Authorization
+
+Added in `AddBusinessRules()` method. Controls access to specific properties.
+
+**Authorization actions**: `ReadProperty`, `WriteProperty`, `ExecuteMethod`
+
+Example: `BusinessRules.AddRule(new Rules.CommonRules.IsInRole(AuthorizationActions.WriteProperty, SalaryProperty, "Admin, HR"));`
+
+### Rule Checking
+
+Call `BusinessRules.CheckRules()` or `await BusinessRules.CheckRulesAsync()` at the end of data portal operations to run all rules and populate validation state.
+
+**When to use async**: Use `CheckRulesAsync()` when the business class has any async business rules. It also works with synchronous rules, making it the recommended default approach.
+
+## Common Patterns and Best Practices
+
+### Dependency Injection
+
+Use `[Inject]` attribute on data portal method parameters to inject DAL interfaces, services, and other dependencies.
+
+### Error Handling
+
+Let exceptions propagate from data portal operations. The data portal handles them and returns them to the caller. The data portal relies on exceptions to know that it should rollback any transaction in progress.
+
+### Async vs Sync
+
+All data portal operations support both sync and async. Use async methods when calling async DAL operations or services.
+
+### Data Access Models
+
+**Recommended**: Encapsulated invocation - Data portal methods in business class invoke external DAL.
+
+**Alternative**: Factory implementation - Data portal methods in separate factory class.
+
+See `Data-Access.md` for detailed patterns.
