@@ -39,15 +39,20 @@ namespace CslaMcpServer.Tools
     }
 
     private const string toolDescription = @" 
-      Searches CSLA .NET documentation and code samples for examples of how to 
-      implement code that makes use of #cslanet. Returns a JSON array of 
-      consolidated search results that merge semantic and word search scores.
-      Use the Fetch tool to retrieve specific code samples by file name.
-      Fetch 'Glossary.md' for definitions of CSLA concepts and terms.";
+      Searches CSLA .NET samples and docs for implementations of #cslanet patterns. 
+      Combines keyword BM25 and vector-semantic matches, returning a JSON array 
+      (file name, overall score, individual word/vector scores). Use this before 
+      calling Fetch to decide which sample files to retrieve. Ask for `Glossary.md` 
+      to clarify CSLA terminology.";
+    private const string searchDescription = @"
+      Natural-language query describing the CSLA concept or pattern you need. Use
+      short phrases such as editable root save, data portal authorization rule, or
+      read-only list fetch. Combine the most relevant keywords; the string feeds
+      both semantic and keyword search scorers.";
 
     [McpServerTool, Description(toolDescription)]
     public async Task<string> Search(
-      [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list, business rule, authorization rule.")]string message,
+      [Description(searchDescription)]string message,
       [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
     {
       logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
