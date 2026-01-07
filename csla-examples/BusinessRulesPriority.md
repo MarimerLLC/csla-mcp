@@ -113,6 +113,97 @@ This ensures:
 1. Don't check email format if email is missing
 2. Don't check uniqueness in database if email format is invalid
 
+## Manual Short-Circuiting with AddSuccessResult
+
+You can manually stop rule execution from within a rule using `context.AddSuccessResult(true)`:
+
+```csharp
+public class StopIfIsNotNew : BusinessRule
+{
+    public StopIfIsNotNew(IPropertyInfo primaryProperty)
+        : base(primaryProperty)
+    {
+    }
+
+    protected override void Execute(IRuleContext context)
+    {
+        var target = (ITrackStatus)context.Target;
+
+        if (!target.IsNew)
+        {
+            // Stop processing rules for this property
+            context.AddSuccessResult(true);
+        }
+        // If IsNew = true, do nothing (rules continue)
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+protected override void AddBusinessRules()
+{
+    base.AddBusinessRules();
+
+    // Stop validation if object is not new (priority -1 to run before other rules)
+    BusinessRules.AddRule(new StopIfIsNotNew(NameProperty) { Priority = -1 });
+
+    // These rules only run if object IsNew = true
+    BusinessRules.AddRule(new Required(NameProperty));
+    BusinessRules.AddRule(new MaxLength(NameProperty, 50));
+}
+```
+
+### Common Short-Circuiting Patterns
+
+**Stop if user cannot write property:**
+
+```csharp
+public class StopIfNotCanWrite : BusinessRule
+{
+    public StopIfNotCanWrite(IPropertyInfo primaryProperty)
+        : base(primaryProperty)
+    {
+    }
+
+    protected override void Execute(IRuleContext context)
+    {
+        if (!CanWriteProperty(PrimaryProperty))
+        {
+            context.AddSuccessResult(true);
+        }
+    }
+}
+```
+
+**Usage:**
+
+```csharp
+protected override void AddBusinessRules()
+{
+    base.AddBusinessRules();
+
+    // Authorization rule
+    BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, SalaryProperty, "Admin"));
+
+    // Only validate Salary if user has write permission (priority -1)
+    BusinessRules.AddRule(new StopIfNotCanWrite(SalaryProperty) { Priority = -1 });
+
+    // Validation rules only run if user can write
+    BusinessRules.AddRule(new MinValue<decimal>(SalaryProperty, 0));
+    BusinessRules.AddRule(new MaxValue<decimal>(SalaryProperty, 1000000));
+}
+```
+
+**Why use `AddSuccessResult(true)`:**
+- Prevents unnecessary validation when conditions aren't met
+- More efficient than letting validation rules fail
+- Cleaner than using Error results to stop execution
+- Useful for conditional validation based on object state
+
+**Note:** `AddSuccessResult(true)` stops ALL subsequent rules for that property, not just the current priority level. This is different from error-based short-circuiting which stops rules at the same or higher priority.
+
 ## Priority Example: Calculation Before Validation
 
 A calculation rule must run before a validation rule that checks the calculated value:
