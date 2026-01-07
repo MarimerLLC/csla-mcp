@@ -38,9 +38,28 @@ namespace CslaMcpServer.Tools
       public string Message { get; set; } = string.Empty;
     }
 
-    [McpServerTool, Description("Searches CSLA .NET code samples and snippets for examples of how to implement code that makes use of #cslanet. Returns a JSON array of consolidated search results that merge semantic and word search scores.")]
+    public class MultipleFilesResult
+    {
+      public string Error { get; set; } = "MultipleVersionsFound";
+      public string Message { get; set; } = string.Empty;
+      public List<string> AvailableFiles { get; set; } = new List<string>();
+    }
+
+    private const string toolDescription = @" 
+      Searches CSLA .NET samples and docs for implementations of #cslanet patterns. 
+      Combines keyword BM25 and vector-semantic matches, returning a JSON array 
+      (file name, overall score, individual word/vector scores). Use this before 
+      calling Fetch to decide which sample files to retrieve. Ask for `Glossary.md` 
+      to clarify CSLA terminology.";
+    private const string searchDescription = @"
+      Natural-language query describing the CSLA concept or pattern you need. Use
+      short phrases such as editable root save, data portal authorization rule, or
+      read-only list fetch. Combine the most relevant keywords; the string feeds
+      both semantic and keyword search scorers.";
+
+    [McpServerTool, Description(toolDescription)]
     public async Task<string> Search(
-      [Description("Keywords used to match against CSLA code samples and snippets. For example, read-write property, editable root, read-only list.")]string message,
+      [Description(searchDescription)]string message,
       [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
     {
       logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
@@ -415,8 +434,8 @@ namespace CslaMcpServer.Tools
       }
     }
 
-    [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet.")]
-    public async Task<string> Fetch([Description("FileName from the search tool.")]string fileName)
+    [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet. If multiple version-specific files exist (e.g., v10/Command.md and v9/Command.md), returns JSON with available file paths to choose from.")]
+    public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v10/Command.md' if multiple versions exist.")]string fileName)
     {
       logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
       
@@ -473,13 +492,40 @@ namespace CslaMcpServer.Tools
         }
         else
         {
-          var error = $"File '{fileName}' not found in code samples directory";
-          logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
-          return JsonSerializer.Serialize(new ErrorResult 
-          { 
-            Error = "FileNotFound", 
-            Message = error 
-          }, new JsonSerializerOptions { WriteIndented = true });
+          // File not found at exact path - check if there are version-specific alternatives
+          var fileNameOnly = Path.GetFileName(fileName);
+          var matchingFiles = FindVersionSpecificFiles(fileNameOnly);
+          
+          if (matchingFiles.Count > 1)
+          {
+            // Multiple version-specific files found
+            var message = $"Multiple versions of '{fileNameOnly}' found. Please specify the version by providing the full path.";
+            logger.LogInformation("[CslaCodeTool.Fetch] {Message}. Available files: [{Files}]", message, string.Join(", ", matchingFiles));
+            return JsonSerializer.Serialize(new MultipleFilesResult
+            {
+              Message = message,
+              AvailableFiles = matchingFiles
+            }, new JsonSerializerOptions { WriteIndented = true });
+          }
+          else if (matchingFiles.Count == 1)
+          {
+            // Single match found in a version-specific folder
+            var matchedFilePath = Path.Combine(CodeSamplesPath, matchingFiles[0]);
+            var content = File.ReadAllText(matchedFilePath);
+            logger.LogInformation("[CslaCodeTool.Fetch] Found single version-specific file '{FileName}', returning content ({Length} characters)", matchingFiles[0], content.Length);
+            return content;
+          }
+          else
+          {
+            // No matches found anywhere
+            var error = $"File '{fileName}' not found in code samples directory";
+            logger.LogError("[CslaCodeTool.Fetch] Error: {Error}", error);
+            return JsonSerializer.Serialize(new ErrorResult 
+            { 
+              Error = "FileNotFound", 
+              Message = error 
+            }, new JsonSerializerOptions { WriteIndented = true });
+          }
         }
       }
       catch (Exception ex)
@@ -492,6 +538,59 @@ namespace CslaMcpServer.Tools
           Message = error 
         }, new JsonSerializerOptions { WriteIndented = true });
       }
+    }
+
+    /// <summary>
+    /// Searches for files with the given name across all version-specific subdirectories.
+    /// Returns a list of relative paths (e.g., "v10/Command.md", "v9/Command.md").
+    /// </summary>
+    private List<string> FindVersionSpecificFiles(string fileName)
+    {
+      var results = new List<string>();
+      
+      try
+      {
+        // Get all .cs and .md files in the code samples directory
+        var allFiles = Directory.GetFiles(CodeSamplesPath, "*.*", SearchOption.AllDirectories)
+          .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || 
+                      f.EndsWith(".md", StringComparison.OrdinalIgnoreCase));
+        
+        // Find files that match the requested file name
+        foreach (var file in allFiles)
+        {
+          if (Path.GetFileName(file).Equals(fileName, StringComparison.OrdinalIgnoreCase))
+          {
+            var relativePath = Path.GetRelativePath(CodeSamplesPath, file)
+              .Replace("\\", "/"); // Normalize to forward slashes for consistency
+            results.Add(relativePath);
+          }
+        }
+        
+        // Sort results by version number (descending) so newest versions appear first
+        results = results
+          .OrderByDescending(path => ExtractVersionNumber(path))
+          .ThenBy(path => path)
+          .ToList();
+      }
+      catch (Exception ex)
+      {
+        logger.LogError(ex, "[CslaCodeTool.FindVersionSpecificFiles] Error searching for version-specific files: {Message}", ex.Message);
+      }
+      
+      return results;
+    }
+
+    /// <summary>
+    /// Extracts the version number from a path like "v10/Command.md" or returns 0 if not in a version folder.
+    /// </summary>
+    private int ExtractVersionNumber(string path)
+    {
+      var match = Regex.Match(path, @"^v(\d+)/");
+      if (match.Success && int.TryParse(match.Groups[1].Value, out int version))
+      {
+        return version;
+      }
+      return 0; // Files not in a version folder are considered version 0
     }
   }
 }

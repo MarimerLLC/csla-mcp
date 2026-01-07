@@ -1,30 +1,142 @@
-# Data Portal Operation Insert
+# Data Portal Operation: Insert
 
-This code snippet demonstrates how to implement the `Insert` data portal operation method in a CSLA .NET business class. The `Insert` method is responsible for inserting a new instance of the business object into a data access layer (DAL) and handling any returned values, such as a newly generated identifier.
+The `[Insert]` operation persists a new business object to a data source. This is invoked automatically when calling `SaveAsync()` on a new object.
+
+## When to Use
+
+- Saving new editable root objects (`BusinessBase<T>`) to the database
+- Called automatically by data portal when object `IsNew` is true
+- Inserts data and retrieves server-generated values (IDs, timestamps)
+- Not used for child objects (they use `InsertChild` instead)
+
+## Basic Insert Pattern
+
+Standard pattern for inserting a new object:
 
 ```csharp
-[Insert]
-private async Task Insert([Inject] ICustomerDal customerDal)
+using Csla;
+
+namespace MyApp.Business
 {
-    // Create a data transfer object (DTO) to hold the values to insert
-    var customerData = new CustomerData
+    [CslaImplementProperties]
+    public partial class Customer : BusinessBase<Customer>
     {
-        Name = ReadProperty(NameProperty),
-        Email = ReadProperty(EmailProperty),
-        CreatedDate = ReadProperty(CreatedDateProperty),
-        IsActive = ReadProperty(IsActiveProperty)
-    };
-    
-    // Call DAL Insert method to insert data
-    var insertedCustomerData = await customerDal.Insert(customerData);
-    
-    // Load returned values from DAL, such as the new Id
-    LoadProperty(IdProperty, insertedCustomerData.Id);
+        public partial int Id { get; private set; }
+        public partial string Name { get; set; }
+        public partial string Email { get; set; }
+        public partial DateTime CreatedDate { get; private set; }
+        public partial bool IsActive { get; set; }
+        
+        [Insert]
+        private async Task Insert([Inject] ICustomerDal dal)
+        {
+            // Create DTO with current values
+            var data = new CustomerData
+            {
+                Name = ReadProperty(NameProperty),
+                Email = ReadProperty(EmailProperty),
+                CreatedDate = ReadProperty(CreatedDateProperty),
+                IsActive = ReadProperty(IsActiveProperty)
+            };
+            
+            // Insert and get back generated values
+            var result = await dal.InsertAsync(data);
+            
+            // Load server-generated ID
+            LoadProperty(IdProperty, result.Id);
+        }
+    }
 }
 ```
 
-In this example, the `Insert` method creates a data transfer object (DTO) or entity object with the current property values of the business object. It then calls the `Insert` method of the injected data access layer (DAL) to perform the insertion. After the insertion, it loads any returned values, such as a newly generated identifier, back into the business object's properties using the `LoadProperty` method.
+## Using BypassPropertyChecks
 
-The `ReadProperty` method is used to get the current values of the properties without triggering any business rules or validation, while the `LoadProperty` method is used to set the property's value internally within the class, bypassing any business rules or validation.
+Read values using normal property syntax:
 
-You can also use the `BypassPropertyChecks` property to set property values directly without triggering business rules or validation.
+```csharp
+[Insert]
+private async Task Insert([Inject] ICustomerDal dal)
+{
+    CustomerData data;
+    
+    using (BypassPropertyChecks)
+    {
+        data = new CustomerData
+        {
+            Name = Name,
+            Email = Email,
+            CreatedDate = CreatedDate,
+            IsActive = IsActive
+        };
+    }
+    
+    var result = await dal.InsertAsync(data);
+    LoadProperty(IdProperty, result.Id);
+}
+```
+
+## Insert with Audit Fields
+
+Capture created by/date information:
+
+```csharp
+[Insert]
+private async Task Insert([Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+{
+    var currentUser = appContext.User.Identity.Name;
+    var now = DateTime.UtcNow;
+    
+    // Update audit fields before insert
+    using (BypassPropertyChecks)
+    {
+        CreatedDate = now;
+        CreatedBy = currentUser;
+    }
+    
+    var data = new CustomerData
+    {
+        Name = ReadProperty(NameProperty),
+        Email = ReadProperty(EmailProperty),
+        CreatedDate = now,
+        CreatedBy = currentUser,
+        IsActive = ReadProperty(IsActiveProperty)
+    };
+    
+    var result = await dal.InsertAsync(data);
+    LoadProperty(IdProperty, result.Id);
+}
+```
+
+## Insert with Child Objects
+
+Insert parent and children together:
+
+```csharp
+[Insert]
+private async Task Insert([Inject] IOrderDal dal)
+{
+    var data = new OrderData
+    {
+        OrderDate = ReadProperty(OrderDateProperty),
+        CustomerId = ReadProperty(CustomerIdProperty),
+        Status = ReadProperty(StatusProperty)
+    };
+    
+    // Insert order and get generated ID
+    var result = await dal.InsertAsync(data);
+    LoadProperty(IdProperty, result.Id);
+    
+    // Now insert children (they need parent ID)
+    var items = ReadProperty(ItemsProperty);
+    await FieldManager.UpdateChildrenAsync(items);
+}
+```
+
+## Important Notes
+
+1. **Use `ReadProperty` or `BypassPropertyChecks`** to get values without triggering rules
+2. **Use `LoadProperty`** to set server-generated values (ID, timestamps)
+3. **Always use async/await** for database operations
+4. **Insert children after parent** so they have the parent ID
+5. **Use `FieldManager.UpdateChildrenAsync()`** to save child collections
+6. **Don't call `CheckRulesAsync()`** - validation already happened before save

@@ -1,127 +1,256 @@
-# Data Portal Operation Fetch
+# Data Portal Operation: Fetch
 
-This code snippet demonstrates how to implement the `Fetch` data portal operation method in a CSLA .NET business class. The `Fetch` method is responsible for retrieving an existing instance of the business object from a data access layer (DAL) based on a provided identifier.
+The `[Fetch]` operation retrieves an existing business object from a data source. This is invoked when calling `IDataPortal<T>.FetchAsync()` on the client.
 
-**CSLA 9:**
+## When to Use
+
+- Loading existing editable root objects (`BusinessBase<T>`)
+- Loading existing read-only root objects (`ReadOnlyBase<T>`)
+- Retrieving data by ID or other criteria
+- Not used for child objects (they use `FetchChild` instead)
+
+## Basic Fetch Pattern
+
+Standard pattern for loading an object by ID:
 
 ```csharp
-[Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+using Csla;
+
+namespace MyApp.Business
 {
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
-
-    // Load values from DAL
-    LoadProperty(IdProperty, customerData.Id);
-    LoadProperty(NameProperty, customerData.Name);
-    LoadProperty(EmailProperty, customerData.Email);
-    LoadProperty(CreatedDateProperty, customerData.CreatedDate);
-    LoadProperty(IsActiveProperty, customerData.IsActive);
-
-    BusinessRules.CheckRules();
+    [CslaImplementProperties]
+    public partial class Customer : BusinessBase<Customer>
+    {
+        public partial int Id { get; private set; }
+        public partial string Name { get; set; }
+        public partial string Email { get; set; }
+        public partial DateTime CreatedDate { get; private set; }
+        public partial bool IsActive { get; set; }
+        
+        [Fetch]
+        private async Task Fetch(int id, [Inject] ICustomerDal dal)
+        {
+            // Retrieve data from DAL
+            var data = await dal.GetAsync(id);
+            
+            // Load values using LoadProperty
+            LoadProperty(IdProperty, data.Id);
+            LoadProperty(NameProperty, data.Name);
+            LoadProperty(EmailProperty, data.Email);
+            LoadProperty(CreatedDateProperty, data.CreatedDate);
+            LoadProperty(IsActiveProperty, data.IsActive);
+            
+            // Validate loaded data
+            await BusinessRules.CheckRulesAsync();
+        }
+    }
 }
 ```
 
-**CSLA 10:**
+## Using BypassPropertyChecks
+
+More natural syntax when loading many properties:
 
 ```csharp
 [Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+private async Task Fetch(int id, [Inject] ICustomerDal dal)
 {
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
-
-    // Load values from DAL
-    LoadProperty(IdProperty, customerData.Id);
-    LoadProperty(NameProperty, customerData.Name);
-    LoadProperty(EmailProperty, customerData.Email);
-    LoadProperty(CreatedDateProperty, customerData.CreatedDate);
-    LoadProperty(IsActiveProperty, customerData.IsActive);
-
-    await CheckRulesAsync();
-}
-```
-
-> **Note:** In CSLA 10, it is recommended to use `await CheckRulesAsync()` instead of `BusinessRules.CheckRules()` to ensure that asynchronous business rules execute properly.
-
-You can also use the BypassPropertyChecks property to set property values directly without triggering business rules or validation:
-
-**CSLA 9:**
-
-```csharp
-[Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
-{
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
-
-    // Load values from DAL using BypassPropertyChecks
+    var data = await dal.GetAsync(id);
+    
     using (BypassPropertyChecks)
     {
-        Id = customerData.Id;
-        Name = customerData.Name;
-        Email = customerData.Email;
-        CreatedDate = customerData.CreatedDate;
-        IsActive = customerData.IsActive;
+        Id = data.Id;
+        Name = data.Name;
+        Email = data.Email;
+        CreatedDate = data.CreatedDate;
+        IsActive = data.IsActive;
     }
-
-    BusinessRules.CheckRules();
+    
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
-**CSLA 10:**
+## Using DataMapper
+
+Efficient mapping for objects with many properties:
 
 ```csharp
 [Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+private async Task Fetch(int id, [Inject] ICustomerDal dal)
 {
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
+    var data = await dal.GetAsync(id);
+    
+    // Automatically map matching properties from data to this object
+    DataMapper.Map(data, this);
+    
+    await BusinessRules.CheckRulesAsync();
+}
+```
 
-    // Load values from DAL using BypassPropertyChecks
+**Note**: `DataMapper` requires property names to match between source and target objects.
+
+## Fetch with Multiple Parameters
+
+Query by multiple criteria:
+
+```csharp
+// Client code
+var customer = await customerPortal.FetchAsync(customerId: 123, includeInactive: true);
+
+// Server-side Fetch operation
+[Fetch]
+private async Task Fetch(int customerId, bool includeInactive, [Inject] ICustomerDal dal)
+{
+    var data = await dal.GetAsync(customerId, includeInactive);
+    
     using (BypassPropertyChecks)
     {
-        Id = customerData.Id;
-        Name = customerData.Name;
-        Email = customerData.Email;
-        CreatedDate = customerData.CreatedDate;
-        IsActive = customerData.IsActive;
+        Id = data.Id;
+        Name = data.Name;
+        Email = data.Email;
+        IsActive = data.IsActive;
     }
-
-    await CheckRulesAsync();
+    
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
-You can also use `DataMapper` or similar tools to map data from the DAL object to the business object properties if you have many properties to map.
+## Fetch with Criteria Object
 
-**CSLA 9:**
+For complex query parameters:
 
 ```csharp
-[Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+public class CustomerCriteria
 {
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
+    public int? Id { get; set; }
+    public string Email { get; set; }
+    public DateTime? RegisteredAfter { get; set; }
+}
 
-    // Map values from DAL to business object properties
-    DataMapper.Map(customerData, this);
+// Client code
+var criteria = new CustomerCriteria { Email = "user@example.com" };
+var customer = await customerPortal.FetchAsync(criteria);
 
-    BusinessRules.CheckRules();
+// Server-side Fetch operation
+[Fetch]
+private async Task Fetch(CustomerCriteria criteria, [Inject] ICustomerDal dal)
+{
+    var data = await dal.FindAsync(criteria);
+    
+    if (data == null)
+        throw new DataNotFoundException("Customer not found");
+    
+    DataMapper.Map(data, this);
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
-**CSLA 10:**
+## Fetch with Child Objects
+
+Load parent with children (avoiding N+1 queries):
 
 ```csharp
 [Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
+private async Task Fetch(int orderId, [Inject] IOrderDal orderDal, [Inject] IChildDataPortal<OrderItemList> itemPortal)
 {
-    // Call DAL Fetch method to get data
-    var customerData = await customerDal.Fetch(id);
+    // Fetch order data and all related items in ONE query
+    var orderData = await orderDal.GetOrderWithItemsAsync(orderId);
+    
+    using (BypassPropertyChecks)
+    {
+        Id = orderData.Id;
+        OrderDate = orderData.OrderDate;
+        CustomerId = orderData.CustomerId;
+        Status = orderData.Status;
+        
+        // Fetch child list, passing the item rows
+        Items = await itemPortal.FetchChildAsync(orderData.Items);
+    }
+    
+    await BusinessRules.CheckRulesAsync();
+}
+```
 
-    // Map values from DAL to business object properties
-    DataMapper.Map(customerData, this);
+## Read-Only Object Fetch
 
-    await CheckRulesAsync();
+Pattern for read-only objects:
+
+```csharp
+[CslaImplementProperties]
+public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
+{
+    public partial int Id { get; private set; }
+    public partial string Name { get; private set; }
+    public partial string Email { get; private set; }
+    
+    [Fetch]
+    private async Task Fetch(int id, [Inject] ICustomerDal dal)
+    {
+        var data = await dal.GetAsync(id);
+        
+        using (BypassPropertyChecks)
+        {
+            Id = data.Id;
+            Name = data.Name;
+            Email = data.Email;
+        }
+        
+        // Read-only objects typically don't need CheckRulesAsync
+    }
+}
+```
+
+## Important Notes
+
+1. **Always use async/await** for database operations
+2. **Use `LoadProperty` or `BypassPropertyChecks`** to avoid triggering change tracking
+3. **Call `CheckRulesAsync()` at the end** to validate loaded data (editable objects)
+4. **Read-only objects** typically don't need `CheckRulesAsync()`
+5. **Handle not found scenarios** - throw exception or return null depending on requirements
+6. **Load child objects in same query** when possible to avoid N+1 queries
+
+## Common Patterns
+
+### Fetch with Authorization Check
+
+```csharp
+[Fetch]
+private async Task Fetch(int id, [Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+{
+    var data = await dal.GetAsync(id);
+    
+    // Verify user has permission to access this customer
+    if (data.OwnerId != appContext.User.Identity.Name && !appContext.User.IsInRole("Manager"))
+        throw new SecurityException("Not authorized to access this customer");
+    
+    DataMapper.Map(data, this);
+    await BusinessRules.CheckRulesAsync();
+}
+```
+
+### Fetch with Optimistic Concurrency
+
+```csharp
+[CslaImplementProperties]
+public partial class Customer : BusinessBase<Customer>
+{
+    public partial int Id { get; private set; }
+    public partial string Name { get; set; }
+    public partial byte[] RowVersion { get; private set; }
+    
+    [Fetch]
+    private async Task Fetch(int id, [Inject] ICustomerDal dal)
+    {
+        var data = await dal.GetAsync(id);
+        
+        using (BypassPropertyChecks)
+        {
+            Id = data.Id;
+            Name = data.Name;
+            RowVersion = data.RowVersion; // For concurrency checking
+        }
+        
+        await BusinessRules.CheckRulesAsync();
+    }
 }
 ```
