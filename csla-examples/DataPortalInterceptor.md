@@ -91,4 +91,33 @@ In this example, the `AddCsla` method is used to configure the data portal to ad
 
 It is important to understand that the server-side data portal allows multiple interceptors to be registered, and they are all invoked, so it is possible to have a number of pre- and post-processing operations occur on each root data portal call.
 
-An interceptor that is registered by default executes all business rules of the business object graph during pre-processing, ensuring that all rules are run even if the logical client somehow didn't run the rules.
+## Built-In Interceptors
+
+CSLA includes a built-in interceptor called the **RevalidatingInterceptor** that is registered by default. This interceptor executes all business rules of the business object graph during pre-processing (before Insert, Update, or Delete operations), ensuring that all rules are run even if the logical client somehow didn't run the rules.
+
+### RevalidatingInterceptor
+
+The RevalidatingInterceptor helps ensure data integrity by validating business rules on the server before data portal operations execute.
+
+**CSLA 9:**
+The interceptor validates on all operations (Insert, Update, Delete) with no configuration options.
+
+**CSLA 10:**
+The interceptor can be configured using the .NET Options pattern to skip validation during Delete operations. See [v10/RevalidatingInterceptor.md](v10/RevalidatingInterceptor.md) for details on configuring the `IgnoreDeleteOperation` option.
+
+**Common Configuration (All Versions):**
+
+The RevalidatingInterceptor is automatically registered when you call `AddCsla()`. You don't need to manually register it:
+
+```csharp
+builder.Services.AddCsla(); // RevalidatingInterceptor is automatically included
+```
+
+If you want to disable it entirely, you can clear the interceptor providers (though this is rarely needed):
+
+```csharp
+builder.Services.AddCsla((o) => o
+    .DataPortal((x) => x
+      .AddServerSideDataPortal((s) => s
+        .InterceptorProviders.Clear()))); // Removes all interceptors including RevalidatingInterceptor
+```
