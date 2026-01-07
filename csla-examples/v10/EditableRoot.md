@@ -64,12 +64,12 @@ namespace CslaExamples
         {
             // Call DAL Create method to get default values
             var customerData = await customerDal.Create();
-            
+
             // Load default values from DAL
             LoadProperty(CreatedDateProperty, customerData.CreatedDate);
             LoadProperty(IsActiveProperty, customerData.IsActive);
-            
-            BusinessRules.CheckRules();
+
+            await CheckRulesAsync();
         }
 
         [Fetch]
@@ -77,7 +77,7 @@ namespace CslaExamples
         {
             // Get data from DAL
             var customerData = await customerDal.Get(id);
-            
+
             // Load properties from DAL data
             if (customerData != null)
             {
@@ -92,7 +92,7 @@ namespace CslaExamples
                 throw new ArgumentException($"Customer {id} not found");
             }
 
-            BusinessRules.CheckRules();
+            await CheckRulesAsync();
         }
 
         private static CustomerData CreateCustomerData(Customer customer)
