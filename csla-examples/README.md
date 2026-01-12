@@ -12,7 +12,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 ### Recommended Workflow
 
-```
+```text
 1. search("your query") → returns scored file list
 2. fetch("highest-scoring-file.md") → returns document content  
 3. Use the content to inform your code generation
@@ -23,7 +23,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 ### Quick Reference Documents
 
 | Document | Purpose | When to Use |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `Glossary.md` | Term definitions, attribute reference, quick lookup tables | Clarifying CSLA terminology, looking up attribute syntax, understanding concepts |
 | `ObjectStereotypes.md` | Overview of all CSLA object stereotypes and base classes | Deciding which base class to use for a business object |
 | `DataPortalGuide.md` | In-depth guide to data portal architecture and operations | Understanding data portal flow, client/server architecture, transactions |
@@ -31,7 +31,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 ### Topic-Specific Documents
 
 | Document | Covers |
-|----------|--------|
+| ---------- | -------- |
 | `Data-Access.md` | Data access layer patterns, DAL design, encapsulated invocation |
 | `DataMapper.md` | Mapping between DTOs and business objects |
 | `BusinessRules.md` | Business rule implementation overview |
@@ -42,11 +42,12 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | `BusinessRulesContext.md` | Rule context and execution flow |
 | `BusinessRulesObjectLevel.md` | Object-level validation rules |
 | `BusinessRulesPriority.md` | Rule execution priority |
+| `BusinessRulesUnitTesting.md` | Unit testing rules with Rocks mocking framework |
 
 ### Data Portal Operation Documents
 
 | Document | Operation |
-|----------|-----------|
+| ---------- | ----------- |
 | `DataPortalOperationCreate.md` | `[Create]` - Initializing new objects |
 | `DataPortalOperationFetch.md` | `[Fetch]` - Retrieving existing objects |
 | `DataPortalOperationInsert.md` | `[Insert]` - Saving new objects |
@@ -57,7 +58,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 ### Configuration Documents
 
 | Document | Covers |
-|----------|--------|
+| ---------- | -------- |
 | `BlazorConfiguration.md` | Blazor-specific CSLA configuration |
 | `HttpProxyConfiguration.md` | HTTP proxy setup for remote data portal |
 | `CustomSerializers.md` | Custom serialization configuration |
@@ -65,7 +66,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 ### Extension Points
 
 | Document | Covers |
-|----------|--------|
+| ---------- | -------- |
 | `DataPortalActivator.md` | Custom object activation |
 | `DataPortalCache.md` | Data portal caching |
 | `DataPortalDashboard.md` | Monitoring and diagnostics |
@@ -77,11 +78,12 @@ This folder contains documentation and code examples for the CSLA .NET framework
 The `v9/` and `v10/` subdirectories contain version-specific implementation details:
 
 | Folder | CSLA Version | Key Differences |
-|--------|--------------|-----------------|
+| -------- | -------------- | ----------------- |
 | `v10/` | CSLA 10+ | Uses `[CslaImplementProperties]` for code generation, partial properties |
 | `v9/` | CSLA 9.x | Manual property implementation with `GetProperty`/`SetProperty` |
 
 **Version-specific documents include:**
+
 - `Properties.md` - Property declaration patterns (major differences between versions)
 - `EditableRoot.md`, `EditableChild.md`, etc. - Complete stereotype implementations
 - `Command.md` - Command object patterns
@@ -89,7 +91,7 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 
 ## Document Relationships
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        README.md (this file)                     │
 │                    Entry point / Navigation guide                │
@@ -124,6 +126,7 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 ## Search Tips for AI Assistants
 
 **Effective queries:**
+
 - "editable root with child list" - Find parent-child patterns
 - "async business rule validation" - Find async rule implementation
 - "data portal fetch operation" - Find fetch implementation details
@@ -131,6 +134,7 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 - "command execute server" - Find command object patterns
 
 **The search combines:**
+
 - **Semantic/vector search** - Understands concept similarity
 - **BM25 keyword search** - Finds exact term matches
 - Results are scored and ranked by relevance
@@ -140,7 +144,7 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 Some concepts appear in multiple documents at different levels of detail:
 
 | Concept | Quick Reference | Detailed Coverage |
-|---------|-----------------|-------------------|
+| --------- | ----------------- | ------------------- |
 | Stereotypes | `Glossary.md` | `ObjectStereotypes.md`, `v10/*.md` |
 | Data Portal Operations | `Glossary.md` | `DataPortalGuide.md`, `DataPortalOperation*.md` |
 | Data Access Models | `Glossary.md` | `DataPortalGuide.md`, `Data-Access.md` |
@@ -148,6 +152,7 @@ Some concepts appear in multiple documents at different levels of detail:
 | Properties | `Glossary.md` | `v10/Properties.md`, `v9/Properties.md` |
 
 This intentional overlap allows:
+
 - Quick lookups via `Glossary.md` for syntax and definitions
 - Deep dives via specialized documents for implementation guidance
 
