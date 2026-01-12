@@ -6,6 +6,7 @@ The CSLA .NET Data Portal is a powerful and foundational component that abstract
 - `Data-Access.md` - Concrete DAL implementation examples using ADO.NET and Entity Framework Core
 - `Glossary.md` - Quick reference for data portal operations and attributes
 - `DataPortalOperation*.md` - Detailed examples for each data portal operation (Create, Fetch, Insert, Update, Delete, Execute)
+- `DataPortalChannels.md` - In-depth guide to data portal channels and implementing custom transport protocols
 
 ## 1. What is the Data Portal?
 
@@ -69,6 +70,8 @@ A "data portal channel" is the combination of a client-side proxy and a server-s
 *   **Custom Channels:** You can create your own channels to support other protocols like gRPC, RabbitMQ, or any other transport you need. This is an advanced extensibility point.
 
 The client-side data portal selects the configured proxy, which then handles the details of communicating with its corresponding host on the server.
+
+**For detailed information on channels, including architecture, built-in channels (HTTP, gRPC, RabbitMQ), and implementing custom channels, see [DataPortalChannels.md](DataPortalChannels.md).**
 
 ### Server-Side Host
 

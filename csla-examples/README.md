@@ -34,6 +34,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | ---------- | -------- |
 | `Data-Access.md` | Data access layer patterns, DAL design, encapsulated invocation |
 | `DataMapper.md` | Mapping between DTOs and business objects |
+| `DataPortalChannels.md` | Data portal channels architecture, built-in channels, implementing custom channels |
 | `BusinessRules.md` | Business rule implementation overview |
 | `BusinessRulesValidation.md` | Validation rules (Required, StringLength, etc.) |
 | `BusinessRulesAsync.md` | Async business rules |
@@ -60,7 +61,9 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | Document | Covers |
 | ---------- | -------- |
 | `BlazorConfiguration.md` | Blazor-specific CSLA configuration |
-| `HttpProxyConfiguration.md` | HTTP proxy setup for remote data portal |
+| `HttpDataPortalConfiguration.md` | HTTP channel configuration for remote data portal |
+| `GrpcDataPortalConfiguration.md` | gRPC channel configuration |
+| `RabbitMqDataPortalConfiguration.md` | RabbitMQ channel configuration |
 | `CustomSerializers.md` | Custom serialization configuration |
 
 ### Extension Points
@@ -132,6 +135,7 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 - "data portal fetch operation" - Find fetch implementation details
 - "authorization rule property" - Find property-level authorization
 - "command execute server" - Find command object patterns
+- "custom data portal channel" - Find channel implementation guidance
 
 **The search combines:**
 
