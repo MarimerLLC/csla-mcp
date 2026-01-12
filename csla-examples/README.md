@@ -150,3 +150,13 @@ Some concepts appear in multiple documents at different levels of detail:
 This intentional overlap allows:
 - Quick lookups via `Glossary.md` for syntax and definitions
 - Deep dives via specialized documents for implementation guidance
+
+## Additional Resources
+
+For information beyond what's in this documentation:
+
+- [CSLA .NET Website](https://cslanet.com/) - Official documentation, books, and training
+- [CSLA .NET GitHub](https://github.com/MarimerLLC/csla) - Source code and issue tracking
+- [CSLA .NET Discussions](https://github.com/MarimerLLC/csla/discussions) - Community Q&A
+
+> **Note for AI assistants**: These external links are provided for user reference. The local documentation in this folder should be sufficient for most code generation tasks.
