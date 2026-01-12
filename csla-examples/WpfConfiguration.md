@@ -63,6 +63,49 @@ namespace WpfExample
 }
 ```
 
+## Brownfield Configuration
+
+For existing WPF applications where dependency injection is not used, CSLA can be configured by exposing a `Csla.ApplicationContext` instance as an app-wide static property. This approach uses the service locator pattern, where the application's code can use the static `ApplicationContext` property to access the underlying DI container and create CSLA services.
+
+### Application Startup
+
+Configure CSLA in `App.xaml.cs` and expose a static `ApplicationContext` property:
+
+```csharp
+using System;
+using System.Windows;
+using Csla;
+using Csla.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace BrownfieldWpf
+{
+  /// <summary>
+  /// Interaction logic for App.xaml
+  /// </summary>
+  public partial class App : Application
+  {
+    public App()
+    {
+      var services = new ServiceCollection();
+      services.AddCsla();
+      var provider = services.BuildServiceProvider();
+      ApplicationContext = provider.GetService<ApplicationContext>();
+    }
+
+    public static ApplicationContext ApplicationContext { get; private set; }
+  }
+}
+```
+
+Your code can then access any CSLA service via this static property. For example, you can get a data portal instance like this:
+
+```csharp
+var portal = App.ApplicationContext.GetRequiredService<IDataPortal<MyBusinessClass>>();
+```
+
+
+
 ### Key Configuration Points
 
 #### AddXaml()
@@ -160,6 +203,40 @@ public class PersonEditViewModel
   }
 }
 ```
+
+### ViewModel without Dependency Injection
+
+In an application that doesn't use DI, you can get a data portal instance from the static `ApplicationContext` property:
+
+```csharp
+using Csla;
+using System.Threading.Tasks;
+
+public class PersonEditViewModel
+{
+  private readonly IDataPortal<Person> _portal;
+  public Person Person { get; set; }
+
+  public PersonEditViewModel()
+  {
+    _portal = App.ApplicationContext.GetRequiredService<IDataPortal<Person>>();
+  }
+
+  public async Task LoadPerson(int id)
+  {
+    Person = await _portal.FetchAsync(id);
+  }
+
+  public async Task SavePerson()
+  {
+    if (Person.IsSavable)
+    {
+      Person = await Person.SaveAsync();
+    }
+  }
+}
+```
+
 
 ## Multi-Tier Configuration
 
