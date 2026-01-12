@@ -4,7 +4,13 @@ This glossary defines terms and concepts commonly used in CSLA .NET development.
 
 **Version Focus**: This document primarily covers CSLA .NET version 10, which uses code generation via `[CslaImplementProperties]`. Version 9 examples exist in `v9/` subdirectory for reference.
 
-**Related Documents**: Detailed implementation examples with full code snippets exist for stereotypes (e.g., `EditableRoot.md`), properties (`Properties.md`), data access patterns (`Data-Access.md`), and each data portal operation (e.g., `DataPortalOperationFetch.md`).
+**Related Documents**:
+- `ObjectStereotypes.md` - Overview of all stereotypes and when to use each base class
+- `DataPortalGuide.md` - In-depth guide to data portal architecture, proxies, channels, and root vs child operations
+- `Data-Access.md` - Concrete DAL implementation examples using ADO.NET and Entity Framework Core
+- `v10/Properties.md` - Property declaration patterns for CSLA 10
+- `DataPortalOperation*.md` - Detailed examples for each data portal operation (Create, Fetch, Insert, Update, Delete, Execute)
+- `v10/EditableRoot.md`, `v10/EditableChild.md`, etc. - Complete stereotype implementations with full code
 
 ## Architecture
 
@@ -52,7 +58,7 @@ These attributes mark methods that implement data portal operations. Methods are
 
 ## Stereotypes
 
-There are object-oriented stereotypes supported by the CSLA base classes.
+There are object-oriented stereotypes supported by the CSLA base classes. For a more detailed overview of when to use each stereotype, see `ObjectStereotypes.md`.
 
 | Stereotype | Base class | Definition | Generic parameters |
 | --- | --- | --- | --- |
@@ -71,9 +77,9 @@ There are object-oriented stereotypes supported by the CSLA base classes.
 
 ## Data portal and data access
 
-CSLA is not an ORM, and doesn't implement any data access itself. All data access code should be in the data access layer.
+CSLA is not an ORM, and doesn't implement any data access itself. All data access code should be in the data access layer. For an in-depth architectural guide to the data portal, see `DataPortalGuide.md`. For concrete DAL implementation examples, see `Data-Access.md`.
 
-However, CSLA does have an important construct called the "data portal" which abstracts persistence of all business domain types. The data portal supports two concepts: root objects and child objects.
+CSLA has an important construct called the "data portal" which abstracts persistence of all business domain types. The data portal supports two concepts: root objects and child objects.
 
 A root object is a business domain type that might contain child objects. The root object and all its child objects are called an _object graph_.
 
