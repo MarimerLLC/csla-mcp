@@ -133,6 +133,7 @@ context.AddInformationResult("Just FYI");           // Information - no action n
 7. Results are collected and applied
 
 **Short-Circuiting Example:**
+
 ```csharp
 // Priority -1: Check if required (runs first)
 BusinessRules.AddRule(new Required(EmailProperty) { Priority = -1 });
@@ -187,6 +188,7 @@ For detailed information on specific rule types and patterns, see:
 - [BusinessRulesObjectLevel.md](BusinessRulesObjectLevel.md) - Object-level validation and authorization rules
 - [BusinessRulesAsync.md](BusinessRulesAsync.md) - Asynchronous rules
 - [BusinessRulesAuthorization.md](BusinessRulesAuthorization.md) - Authorization rules
+- [BusinessRulesUnitTesting.md](BusinessRulesUnitTesting.md) - Unit testing rules in isolation with Rocks
 
 ## Best Practices
 

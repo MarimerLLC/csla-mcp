@@ -7,6 +7,7 @@ CSLA supports ASP.NET Core MVC and Razor Pages applications with straightforward
 ASP.NET Core MVC and Razor Pages are server-side rendering frameworks that run entirely on the server. Unlike Blazor, there is no client/server boundary for the data portal, which simplifies configuration significantly.
 
 **Key characteristics:**
+
 - All code executes on the server
 - No data portal proxy configuration needed (unless using a separate app server)
 - Standard ASP.NET Core authentication and authorization
@@ -182,6 +183,7 @@ builder.Services.AddCsla(o => o
 ```
 
 This registers:
+
 - `ApplicationContextManagerHttpContext` as the context manager
 - HTTP context accessor integration
 - MVC model binder support
@@ -195,6 +197,7 @@ options.ModelBinderProviders.Insert(0, new CslaModelBinderProvider());
 ```
 
 This model binder:
+
 - Properly handles CSLA object state during model binding
 - Supports validation integration with ASP.NET Core model state
 - Works with both MVC controllers and Razor Page handlers
@@ -387,7 +390,7 @@ public class DataPortalController : Csla.Server.Hosts.HttpPortalController
 ## Comparison: Razor Pages vs MVC
 
 | Feature | Razor Pages | MVC |
-|---------|-------------|-----|
+| --------- | ------------- | ----- |
 | CSLA Configuration | Identical | Identical |
 | Service Registration | `AddRazorPages()` | `AddControllersWithViews()` |
 | Routing | Page-based (`@page`) | Controller-based |
@@ -410,18 +413,21 @@ Both frameworks use the same CSLA configuration. The only differences are in how
 ### Business Object State Not Preserved
 
 If business object state is lost during post-back:
+
 - Verify `CslaModelBinderProvider` is registered
 - Ensure it's inserted at position 0 in the provider list
 
 ### Context Not Available
 
 If you get errors about missing context:
+
 - Verify `AddHttpContextAccessor()` is called
 - Ensure `AddAspNetCore()` is called in CSLA configuration
 
 ### Data Portal Not Working
 
 If data portal calls fail:
+
 - For local data portal: Verify DAL services are registered
 - For remote data portal: Check the data portal URL and network connectivity
 - Ensure business object assemblies are referenced correctly
