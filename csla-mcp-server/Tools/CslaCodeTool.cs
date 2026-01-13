@@ -48,9 +48,11 @@ namespace CslaMcpServer.Tools
     private const string toolDescription = @" 
       Searches CSLA .NET samples and docs for implementations of #cslanet patterns. 
       Combines keyword BM25 and vector-semantic matches, returning a JSON array 
-      (file name, overall score, individual word/vector scores). Use this before 
-      calling Fetch to decide which sample files to retrieve. Ask for `Glossary.md` 
-      to clarify CSLA terminology.";
+      (file name, overall score, individual word/vector scores). 
+      
+      IMPORTANT: Before your first search, fetch `README.md` for navigation guidance,
+      document organization, and tips on effective search queries. Use `Glossary.md` 
+      for quick term lookups and attribute syntax.";
     private const string searchDescription = @"
       Natural-language query describing the CSLA concept or pattern you need. Use
       short phrases such as editable root save, data portal authorization rule, or
@@ -434,7 +436,7 @@ namespace CslaMcpServer.Tools
       }
     }
 
-    [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet. If multiple version-specific files exist (e.g., v10/Command.md and v9/Command.md), returns JSON with available file paths to choose from.")]
+    [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet. Start by fetching `README.md` for navigation guidance and document organization. If multiple version-specific files exist (e.g., v10/Command.md and v9/Command.md), returns JSON with available file paths to choose from.")]
     public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v10/Command.md' if multiple versions exist.")]string fileName)
     {
       logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
