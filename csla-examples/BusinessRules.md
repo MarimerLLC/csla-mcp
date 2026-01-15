@@ -10,6 +10,7 @@ CSLA supports several types of rules:
 2. **Calculation Rules** - Calculate and set property values based on other properties
 3. **Authorization Rules** - Control read/write access to properties
 4. **Async Rules** - Rules that execute asynchronously (e.g., server lookups, API calls)
+5. **Lambda Rules** - Inline rules defined using lambda expressions for simple validation logic
 
 ## Rule Severity Levels
 
@@ -183,6 +184,7 @@ For detailed information on specific rule types and patterns, see:
 
 - [BusinessRulesValidation.md](BusinessRulesValidation.md) - Simple and complex validation rules
 - [BusinessRulesCalculation.md](BusinessRulesCalculation.md) - Property calculation rules
+- [BusinessRulesLambda.md](BusinessRulesLambda.md) - Inline lambda expression rules for simple validation
 - [BusinessRulesPriority.md](BusinessRulesPriority.md) - Rule priorities, execution order, and short-circuiting
 - [BusinessRulesContext.md](BusinessRulesContext.md) - Rule context, execution flags (IsCheckRulesContext), and context properties
 - [BusinessRulesObjectLevel.md](BusinessRulesObjectLevel.md) - Object-level validation and authorization rules
