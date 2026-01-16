@@ -45,21 +45,25 @@ namespace CslaMcpServer.Tools
       public List<string> AvailableFiles { get; set; } = new List<string>();
     }
 
-    private const string toolDescription = @" 
-      Searches CSLA .NET samples and docs for implementations of #cslanet patterns. 
-      Combines keyword BM25 and vector-semantic matches, returning a JSON array 
-      (file name, overall score, individual word/vector scores). 
-      
-      IMPORTANT: Before your first search, fetch `README.md` for navigation guidance,
-      document organization, and tips on effective search queries. Use `Glossary.md` 
-      for quick term lookups and attribute syntax.";
+    private const string mcpServerDescription = @"
+      Authoritative CSLA .NET (cslanet) framework knowledge base. Covers business objects
+      (BusinessBase, ReadOnlyBase, CommandBase, EditableRoot, EditableChild),
+      data portal operations (Create, Fetch, Insert, Update, Delete), validation
+      and business rules, authorization, property implementations (managed/unmanaged),
+      and mobile object patterns. Returns JSON array with file name and relevance
+      scores. Fetch `README.md` for detailed usage guidance. Use `Glossary.md` for
+      CSLA terminology.";
     private const string searchDescription = @"
       Natural-language query describing the CSLA concept or pattern you need. Use
       short phrases such as editable root save, data portal authorization rule, or
       read-only list fetch. Combine the most relevant keywords; the string feeds
       both semantic and keyword search scorers.";
+    private const string fetchDescription = @"
+      Fetches a specific CSLA.NET document, code sample, or snippet by name. Returns 
+      the content of the file that can be used to understand concepts and properly 
+      implement code that uses CSLA .NET.";
 
-    [McpServerTool, Description(toolDescription)]
+    [McpServerTool, Description(mcpServerDescription)]
     public async Task<string> Search(
       [Description(searchDescription)]string message,
       [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
@@ -436,7 +440,7 @@ namespace CslaMcpServer.Tools
       }
     }
 
-    [McpServerTool, Description("Fetches a specific CSLA .NET code sample or snippet by name. Returns the content of the file that can be used to properly implement code that uses #cslanet. Start by fetching `README.md` for navigation guidance and document organization. If multiple version-specific files exist (e.g., v10/Command.md and v9/Command.md), returns JSON with available file paths to choose from.")]
+    [McpServerTool, Description(fetchDescription)]
     public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v10/Command.md' if multiple versions exist.")]string fileName)
     {
       logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
