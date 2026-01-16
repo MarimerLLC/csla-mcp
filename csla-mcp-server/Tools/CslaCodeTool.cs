@@ -603,9 +603,11 @@ namespace CslaMcpServer.Tools
     [McpServerTool, Description("Returns the CSLA MCP server version.")]
     public string Version()
     {
+      logger.LogInformation("[CslaCodeTool.Version] Called");
       var assembly = Assembly.GetExecutingAssembly();
       var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
           ?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "unknown";
+      logger.LogInformation("[CslaCodeTool.Version] Returning version: {Version}", version);
       return version;
     }
   }

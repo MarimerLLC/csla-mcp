@@ -19,3 +19,12 @@ echo "Pushing ${REMOTE_IMAGE} to Docker Hub (ensure you've run 'docker login')"
 docker push "${REMOTE_IMAGE}"
 
 echo "Pushed image: ${REMOTE_IMAGE}"
+
+echo "Triggering Azure Web App to pull new image..."
+az webapp config container set \
+  --name csla-mcp-server \
+  --resource-group csla-mcp \
+  --container-image-name "${REMOTE_IMAGE}" \
+  --output none
+
+echo "Deployment triggered successfully"
