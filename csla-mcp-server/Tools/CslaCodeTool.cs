@@ -138,14 +138,14 @@ namespace CslaMcpServer.Tools
         }
 
         // Create tasks for parallel execution
-        var wordSearchTask = Task.Run(() => PerformWordSearch(allFiles, searchTerms, version.Value));
-        var semanticSearchTask = Task.Run(() => PerformSemanticSearch(message, version));
+        var wordSearchTask = PerformWordSearchAsync(allFiles, searchTerms, version.Value);
+        var semanticSearchTask = PerformSemanticSearchAsync(message, version);
 
         // Wait for both tasks to complete
-        Task.WaitAll(wordSearchTask, semanticSearchTask);
+        await Task.WhenAll(wordSearchTask, semanticSearchTask);
 
-        var wordMatches = wordSearchTask.Result;
-        var semanticMatches = semanticSearchTask.Result;
+        var wordMatches = await wordSearchTask;
+        var semanticMatches = await semanticSearchTask;
         
         // Create consolidated results
         var consolidatedResults = ConsolidateSearchResults(semanticMatches, wordMatches);
@@ -225,7 +225,7 @@ namespace CslaMcpServer.Tools
       return sortedResults;
     }
 
-    private List<SearchResult> PerformWordSearch(IEnumerable<string> allFiles, List<string> searchTerms, int version)
+    private async Task<List<SearchResult>> PerformWordSearchAsync(IEnumerable<string> allFiles, List<string> searchTerms, int version)
     {
       logger.LogInformation("[CslaCodeTool.PerformWordSearch] Starting word search for version {Version}", version);
       var results = new List<SearchResult>();
@@ -243,7 +243,7 @@ namespace CslaMcpServer.Tools
           if (!isCommon && !isMatchingVersion)
             continue;
 
-          var content = File.ReadAllText(file);
+          var content = await File.ReadAllTextAsync(file);
           // Document length as number of word tokens
           var docLength = GetDocumentLength(content);
           candidateDocs.Add((relativePath.Replace("\\", "/"), content, docLength));
@@ -365,7 +365,7 @@ namespace CslaMcpServer.Tools
       return normalizedResults;
     }
 
-    private List<SemanticMatch> PerformSemanticSearch(string message, int? version)
+    private async Task<List<SemanticMatch>> PerformSemanticSearchAsync(string message, int? version)
     {
       logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Starting semantic search for version {Version}", version);
       var semanticMatches = new List<SemanticMatch>();
@@ -373,7 +373,7 @@ namespace CslaMcpServer.Tools
       if (VectorStore != null && VectorStore.IsReady())
       {
         logger.LogInformation("[CslaCodeTool.PerformSemanticSearch] Performing semantic search");
-        var semanticResults = VectorStore.SearchAsync(message, version, topK: 10).GetAwaiter().GetResult();
+        var semanticResults = await VectorStore.SearchAsync(message, version, topK: 10);
         semanticMatches = semanticResults.Select(r => new SemanticMatch
         {
           FileName = r.FileName,
@@ -493,7 +493,7 @@ namespace CslaMcpServer.Tools
         
         if (File.Exists(filePath))
         {
-          var content = File.ReadAllText(filePath);
+          var content = await File.ReadAllTextAsync(filePath);
           logger.LogInformation("[CslaCodeTool.Fetch] Successfully read file '{FileName}' ({Length} characters)", fileName, content.Length);
           return content;
         }
@@ -501,7 +501,7 @@ namespace CslaMcpServer.Tools
         {
           // File not found at exact path - check if there are version-specific alternatives
           var fileNameOnly = Path.GetFileName(fileName);
-          var matchingFiles = FindVersionSpecificFiles(fileNameOnly);
+          var matchingFiles = await FindVersionSpecificFilesAsync(fileNameOnly);
           
           if (matchingFiles.Count > 1)
           {
@@ -518,7 +518,7 @@ namespace CslaMcpServer.Tools
           {
             // Single match found in a version-specific folder
             var matchedFilePath = Path.Combine(CodeSamplesPath, matchingFiles[0]);
-            var content = File.ReadAllText(matchedFilePath);
+            var content = await File.ReadAllTextAsync(matchedFilePath);
             logger.LogInformation("[CslaCodeTool.Fetch] Found single version-specific file '{FileName}', returning content ({Length} characters)", matchingFiles[0], content.Length);
             return content;
           }
@@ -551,16 +551,20 @@ namespace CslaMcpServer.Tools
     /// Searches for files with the given name across all version-specific subdirectories.
     /// Returns a list of relative paths (e.g., "v10/Command.md", "v9/Command.md").
     /// </summary>
-    private List<string> FindVersionSpecificFiles(string fileName)
+    private async Task<List<string>> FindVersionSpecificFilesAsync(string fileName)
     {
       var results = new List<string>();
       
       try
       {
         // Get all .cs and .md files in the code samples directory
-        var allFiles = Directory.GetFiles(CodeSamplesPath, "*.*", SearchOption.AllDirectories)
-          .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || 
-                      f.EndsWith(".md", StringComparison.OrdinalIgnoreCase));
+        // Note: Directory.GetFiles is synchronous and doesn't have an async alternative
+        // Running on thread pool to avoid blocking
+        var allFiles = await Task.Run(() => 
+          Directory.GetFiles(CodeSamplesPath, "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || 
+                        f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            .ToList());
         
         // Find files that match the requested file name
         foreach (var file in allFiles)
