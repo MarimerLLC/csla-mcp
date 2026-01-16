@@ -1,5 +1,6 @@
 ﻿using ModelContextProtocol.Server;
 using System.ComponentModel;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using CslaMcpServer.Services;
@@ -597,6 +598,15 @@ namespace CslaMcpServer.Tools
         return version;
       }
       return 0; // Files not in a version folder are considered version 0
+    }
+
+    [McpServerTool, Description("Returns the CSLA MCP server version.")]
+    public string Version()
+    {
+      var assembly = Assembly.GetExecutingAssembly();
+      var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+          ?.InformationalVersion ?? assembly.GetName().Version?.ToString() ?? "unknown";
+      return version;
     }
   }
 }

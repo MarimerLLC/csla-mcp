@@ -7,6 +7,8 @@
     <RootNamespace>CslaMcpServer</RootNamespace>
     <UserSecretsId>6e72be26-bc88-4873-b3a7-b85f4b5124e9</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <Version>1.0.0</Version>
+    <InformationalVersion>1.0.0</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
