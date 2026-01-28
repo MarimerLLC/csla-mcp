@@ -190,6 +190,8 @@ For detailed information on specific rule types and patterns, see:
 - [BusinessRulesObjectLevel.md](BusinessRulesObjectLevel.md) - Object-level validation and authorization rules
 - [BusinessRulesAsync.md](BusinessRulesAsync.md) - Asynchronous rules
 - [BusinessRulesAuthorization.md](BusinessRulesAuthorization.md) - Authorization rules
+- [BusinessRulesChildChanged.md](BusinessRulesChildChanged.md) - Triggering parent rules from child object changes
+- [BusinessRulesParentAccess.md](BusinessRulesParentAccess.md) - Accessing parent object properties from child rules
 - [BusinessRulesUnitTesting.md](BusinessRulesUnitTesting.md) - Unit testing rules in isolation with Rocks
 
 ## Best Practices
