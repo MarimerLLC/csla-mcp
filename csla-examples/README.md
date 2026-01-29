@@ -86,6 +86,10 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 | `v10/` | CSLA 10+ | Uses `[CslaImplementProperties]` for code generation, partial properties |
 | `v9/` | CSLA 9.x | Manual property implementation with `GetProperty`/`SetProperty` |
 
+External Links:
+
+- [CSLA .NET Version 10 API Documentation](https://cslanet.com/10.0.0/html/index.html) - API docs for version 10.0.0
+
 **Version-specific documents include:**
 
 - `Properties.md` - Property declaration patterns (major differences between versions)
