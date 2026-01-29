@@ -2,15 +2,38 @@
 
 A CSLA .NET class library project contains business domain classes (stereotypes like EditableRoot, ReadOnlyRoot, etc.). This is the core business logic layer of the application.
 
+**Related Documents**:
+- `../SolutionArchitecture.md` - Comprehensive guide to solution structure and layered architecture
+- `../Data-Access.md` - Data access layer implementation patterns
+- `../Glossary.md` - CSLA terminology and concepts
+
 ## Project Structure
 
-The class library project is typically separate from the UI/API layer and the data access layer, though small applications may combine them.
+The class library project is typically separate from the UI/API layer and the data access layer, though small applications may combine them. For a complete guide to solution architecture, see `../SolutionArchitecture.md`.
 
-**Typical solution structure**:
+**Recommended solution structure**:
 
-* `MyApp.BusinessLibrary` - Business classes (this project)
-* `MyApp.DataAccess` - DAL interfaces and implementations
-* `MyApp.Web` or `MyApp.UI` - Application interface layer
+```
+MySolution/
+├── MyApp.Business/              # Business Layer (this project)
+│   ├── PersonEdit.cs            # Editable business objects
+│   ├── PersonInfo.cs            # Read-only info objects
+│   └── Rules/                   # Custom business rules
+├── MyApp.Dal/                   # Data Access Abstraction
+│   ├── IPersonDal.cs            # DAL interfaces
+│   └── PersonData.cs            # DTOs
+├── MyApp.Dal.EfCore/            # Data Access Concrete
+│   ├── PersonDal.cs             # EF Core implementation
+│   └── MyAppDbContext.cs
+└── MyApp.Web/                   # Presentation Layer
+    ├── Pages/                   # Interface (Razor pages)
+    └── ViewModels/              # Interface Control
+```
+
+**Key architectural principles**:
+- The Business project references ONLY the Dal abstraction project (interfaces/DTOs)
+- The Business project NEVER references concrete DAL implementations
+- All business logic (validation, calculation, authorization) belongs in the Business project
 
 ## Project File (.csproj)
 

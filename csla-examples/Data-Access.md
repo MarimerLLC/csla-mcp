@@ -3,6 +3,7 @@
 As discussed in `Glossary.md`, there are four models for implementing or invoking a data access layer (DAL). This document focuses on the _Encapsulated invocation_ model, which is the recommended approach.
 
 **Related documents:**
+- `SolutionArchitecture.md` - Comprehensive guide to solution structure and the three-tier architecture (Presentation, Business, Data Access)
 - `DataPortalGuide.md` - Architectural overview of the data portal, proxies, channels, and root vs child operations
 - `Glossary.md` - Quick reference for the four data access models and data portal operation attributes
 

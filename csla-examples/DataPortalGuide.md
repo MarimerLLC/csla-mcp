@@ -3,6 +3,7 @@
 The CSLA .NET Data Portal is a powerful and foundational component that abstracts all data access into a consistent and configurable pattern. It enables the creation of a robust business layer that is independent of its physical deployment architecture. This guide provides an in-depth look at the concepts, components, and operations that make up the data portal.
 
 **Related documents:**
+- `SolutionArchitecture.md` - Comprehensive guide to solution structure and the three-tier architecture
 - `Data-Access.md` - Concrete DAL implementation examples using ADO.NET and Entity Framework Core
 - `Glossary.md` - Quick reference for data portal operations and attributes
 - `DataPortalOperation*.md` - Detailed examples for each data portal operation (Create, Fetch, Insert, Update, Delete, Execute)

@@ -14,13 +14,34 @@ This glossary defines terms and concepts commonly used in CSLA .NET development.
 
 ## Architecture
 
-CSLA is designed around the concept that each application has the following logical layers:
+CSLA is designed around a layered architecture with three primary tiers. For a comprehensive guide to solution structure and project organization, see `SolutionArchitecture.md`.
 
-* Interface (user interface or application interface; often Blazor, JSON, etc.)
-* Interface control (code that manages the interface; often a controller, viewmodel, or code-behind a page)
-* Business logic (business domain types created using CSLA base classes and stereotypes)
-* Data access (code that interacts with the data store(s) such as databases, files, or other storage mediums; often implemented with ADO.NET or Entity Framework)
-* Data storage (databases, files, spreadsheets, service APIs, or other locations where data might be retrieved and saved)
+### Presentation Tier
+
+The presentation tier handles all user or system interaction:
+
+| Layer | Description | Examples |
+| --- | --- | --- |
+| Interface | The visual or API surface users interact with | HTML/Razor, JSON API, XAML, WinForms, MAUI |
+| Interface Control | Code that manages the interface behavior | ViewModels, Controllers, Presenters, Code-Behind, Page Models |
+
+### Business Tier
+
+The business tier contains all domain logic:
+
+| Layer | Description | Implementation |
+| --- | --- | --- |
+| Business Logic | Domain objects with all validation, calculation, manipulation, and authorization logic | CSLA base classes and stereotypes with the business rules system |
+
+### Data Access Tier
+
+The data access tier handles all data persistence:
+
+| Layer | Description | Examples |
+| --- | --- | --- |
+| Data Access Abstraction | Interfaces and DTOs that define data contracts | `IPersonDal`, `PersonData` |
+| Data Access Concrete | Implementation of abstraction using a specific technology | Entity Framework, ADO.NET, Dapper |
+| Data Storage | Physical storage for data | SQL databases, files, external APIs |
 
 ## CSLA Attributes
 

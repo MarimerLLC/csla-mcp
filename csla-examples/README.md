@@ -24,6 +24,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 | Document | Purpose | When to Use |
 | ---------- | --------- | ------------- |
+| `SolutionArchitecture.md` | Recommended solution/project structure with layered architecture | Setting up new solutions, understanding layer responsibilities |
 | `Glossary.md` | Term definitions, attribute reference, quick lookup tables | Clarifying CSLA terminology, looking up attribute syntax, understanding concepts |
 | `ObjectStereotypes.md` | Overview of all CSLA object stereotypes and base classes | Deciding which base class to use for a business object |
 | `DataPortalGuide.md` | In-depth guide to data portal architecture and operations | Understanding data portal flow, client/server architecture, transactions |
@@ -100,30 +101,37 @@ The `v9/` and `v10/` subdirectories contain version-specific implementation deta
 │                    Entry point / Navigation guide                │
 └─────────────────────────────────────────────────────────────────┘
                                   │
-          ┌───────────────────────┼───────────────────────┐
-          ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Glossary.md   │    │ObjectStereotypes│    │DataPortalGuide  │
-│  Quick lookup   │    │  .md            │    │    .md          │
-│  & definitions  │    │ Stereotype      │    │ Architecture &  │
-│                 │    │ overview        │    │ deep concepts   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-          │                       │                       │
-          │              ┌────────┴────────┐              │
-          │              ▼                 ▼              │
-          │     ┌─────────────┐   ┌─────────────┐         │
-          │     │ v10/        │   │ v9/         │         │
-          │     │ Stereotype  │   │ Stereotype  │         │
-          │     │ impls       │   │ impls       │         │
-          │     └─────────────┘   └─────────────┘         │
-          │                                               │
-          └──────────────────┬────────────────────────────┘
-                             ▼
-              ┌──────────────────────────────┐
-              │  Topic & Operation docs      │
-              │  (BusinessRules*, DataPortal │
-              │   Operation*, Data-Access)   │
-              └──────────────────────────────┘
+     ┌────────────────────────────┼────────────────────────────────┐
+     ▼                            ▼                                ▼
+┌─────────────────┐    ┌─────────────────────────┐    ┌─────────────────┐
+│SolutionArch.md  │    │   Glossary.md           │    │DataPortalGuide  │
+│ Layered arch &  │    │  Quick lookup           │    │    .md          │
+│ project struct  │    │  & definitions          │    │ Architecture &  │
+└────────┬────────┘    └───────────┬─────────────┘    │ deep concepts   │
+         │                         │                  └─────────────────┘
+         │                         │                          │
+         ▼                         ▼                          │
+┌─────────────────┐    ┌─────────────────┐                    │
+│  Data-Access.md │    │ObjectStereotypes│                    │
+│  DAL patterns   │    │  .md            │                    │
+└─────────────────┘    │ Stereotype      │                    │
+                       │ overview        │                    │
+                       └────────┬────────┘                    │
+                       ┌────────┴────────┐                    │
+                       ▼                 ▼                    │
+              ┌─────────────┐   ┌─────────────┐               │
+              │ v10/        │   │ v9/         │               │
+              │ Stereotype  │   │ Stereotype  │               │
+              │ impls       │   │ impls       │               │
+              └─────────────┘   └─────────────┘               │
+                                                              │
+                       ┌──────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │  Topic & Operation docs      │
+        │  (BusinessRules*, DataPortal │
+        │   Operation*, Configuration) │
+        └──────────────────────────────┘
 ```
 
 ## Search Tips for AI Assistants
@@ -149,9 +157,10 @@ Some concepts appear in multiple documents at different levels of detail:
 
 | Concept | Quick Reference | Detailed Coverage |
 | --------- | ----------------- | ------------------- |
+| Solution Architecture | `Glossary.md` | `SolutionArchitecture.md` |
 | Stereotypes | `Glossary.md` | `ObjectStereotypes.md`, `v10/*.md` |
 | Data Portal Operations | `Glossary.md` | `DataPortalGuide.md`, `DataPortalOperation*.md` |
-| Data Access Models | `Glossary.md` | `DataPortalGuide.md`, `Data-Access.md` |
+| Data Access Models | `Glossary.md` | `SolutionArchitecture.md`, `DataPortalGuide.md`, `Data-Access.md` |
 | Business Rules | `Glossary.md` | `BusinessRules*.md` |
 | Properties | `Glossary.md` | `v10/Properties.md`, `v9/Properties.md` |
 
