@@ -28,4 +28,9 @@ Welcome to the `csla-mcp` repository! To ensure Copilot provides relevant and hi
 - Create all change logs and change documents in the `changelogs` folder.
 - When documenting fixes or other changes, put the documents in the `changelogs` folder.
 
+## Markdown Files
+- Do NOT wrap markdown file content with ````markdown and ```` delimiters at the top and bottom.
+- Markdown files should contain plain markdown content so they render correctly on GitHub and other platforms.
+- Code blocks within markdown files should use the appropriate language fence (e.g., ```csharp), but the file itself should not be wrapped.
+
 Thank you for contributing!
