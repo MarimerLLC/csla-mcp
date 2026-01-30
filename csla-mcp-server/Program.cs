@@ -187,7 +187,12 @@ public sealed class RunCommand : Command<AppSettings>
 
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddMcpServer()
-            .WithHttpTransport()
+            .WithHttpTransport(options =>
+            {
+                // Use stateless mode to avoid "Session not found" errors (-32001)
+                // This is appropriate for tools like search that don't require session state
+                options.Stateless = true;
+            })
             .WithTools<CslaCodeTool>();
 
         // CSLA services (modern pattern using IDataPortal<T>)
