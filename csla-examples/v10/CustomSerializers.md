@@ -97,9 +97,10 @@ The `SerializationInfo` class can store these primitive types:
 | Text | `string`, `char`, `char[]` |
 | Boolean | `bool` |
 | Date/Time | `DateTime`, `DateTimeOffset`, `TimeSpan`, `DateOnly`, `TimeOnly` |
-| Other | `Guid`, `byte[]` |
-| Collections | `List<T>` of primitive types |
+| Other | `Guid`, `byte[]`, `char[]` |
 | Nullable | Nullable versions of all above types |
+
+> ⚠️ Standard .NET collection types such as `List<T>` and `Dictionary<K,V>` are _not_ directly serializable by `MobileFormatter`. Use `MobileList<T>` or `MobileDictionary<K,V>` from `Csla.Core` for serializable collections, or register a custom serializer for your collection type.
 
 For complex types, serialize them as JSON strings or implement child object handling.
 
