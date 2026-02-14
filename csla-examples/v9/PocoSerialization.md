@@ -242,8 +242,9 @@ The `SerializationInfo` class can store these "primitive" types directly:
 - `Guid`
 - `byte[]`
 - `char[]`
-- `List<int>` (and other primitive type lists)
 - Nullable versions of the above types
+
+> ⚠️ Standard .NET collection types such as `List<T>` and `Dictionary<K,V>` are _not_ directly serializable by `MobileFormatter`. Use `MobileList<T>` or `MobileDictionary<K,V>` from `Csla.Core` for serializable collections, or register a custom serializer for your collection type.
 
 For complex types (objects, lists of objects), use the child object methods.
 
