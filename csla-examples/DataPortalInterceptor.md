@@ -6,26 +6,20 @@ The server-side data portal supports a concept called an interceptor. This type 
 
 An interceptor implements `Csla.Server.IInterceptDataPortal`.
 
-The `Initialize` and `InitializeAsync` methods are invoked when a root server-side data portal call begins. This is a location to run code before any normal user code (like data portal operation methods) are executed on the server.
+The `InitializeAsync` method is invoked when a root server-side data portal call begins. This is a location to run code before any normal user code (like data portal operation methods) are executed on the server.
 
-The `Complete` and `CompleteAsync` methods are invoked after a root server-side data portal call is complete. This is a location to run code after any normal user code (like data portal operation methods) have been executed on the server.
+The `Complete` method is invoked after a root server-side data portal call is complete. This is a location to run code after any normal user code (like data portal operation methods) have been executed on the server.
 
-The complete methods will be invoked regardless of whether an exception occurred during normal server-side processing. If an exception occurred, the `InterceptArgs` parameter's `Exception` property will provide access to the exception object.
+The `Complete` method will be invoked regardless of whether an exception occurred during normal server-side processing. If an exception occurred, the `InterceptArgs` parameter's `Exception` property will provide access to the exception object.
 
 The following example is an interceptor that will commit or rollback a database connection after the data portal operation is complete.
 
 ```csharp
 public class TransactionInterceptor(IServiceProvider _serviceProvider) : IInterceptDataPortal
 {
-    public void Initialize(InterceptArgs e)
-    {
-        // Called before the data portal operation begins
-        // Transaction is already created by DI scope, so nothing to do here
-    }
-
     public Task InitializeAsync(InterceptArgs e)
     {
-        // Called before the data portal operation begins (async)
+        // Called before the data portal operation begins
         // Transaction is already created by DI scope, so nothing to do here
         return Task.CompletedTask;
     }
@@ -46,26 +40,6 @@ public class TransactionInterceptor(IServiceProvider _serviceProvider) : IInterc
             {
                 // Exception occurred - rollback the transaction
                 transaction.Rollback();
-            }
-        }
-    }
-
-    public async Task CompleteAsync(InterceptArgs e)
-    {
-        // Called after the data portal operation completes (async)
-        var transaction = _serviceProvider.GetService(typeof(SqlTransaction)) as SqlTransaction;
-        
-        if (transaction != null)
-        {
-            if (e.Exception == null)
-            {
-                // No exception - commit the transaction
-                await transaction.CommitAsync();
-            }
-            else
-            {
-                // Exception occurred - rollback the transaction
-                await transaction.RollbackAsync();
             }
         }
     }
