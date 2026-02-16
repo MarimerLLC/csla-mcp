@@ -80,13 +80,13 @@ Once the server is running, you can connect to it from MCP-compatible tools like
      "github.copilot.chat.mcp.servers": {
        "csla-mcp": {
          "type": "http",
-         "url": "http://localhost:8080/mcp"
+         "url": "http://localhost:8080"
        }
      }
    }
    ```
 
-   > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000/mcp`
+   > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000`
 
 6. **Restart VS Code** to apply the changes
 
