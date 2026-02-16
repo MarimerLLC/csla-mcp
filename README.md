@@ -67,16 +67,14 @@ Once the server is running, you can connect to it from MCP-compatible tools like
 
 1. **Install the GitHub Copilot Chat extension** in VS Code (if not already installed)
 
-2. **Open VS Code Settings** (File > Preferences > Settings or `Ctrl+,`)
+2. **Open the Command Palette**  
+   - Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
 
-3. **Search for "MCP"** in the settings search bar
+3. **Run:**
+   - MCP: Open User Configuration
 
-4. **Find "Chat > MCP: Servers"** and click "Edit in settings.json"
+4. **In the `mcp.json` file that opens, add your server configuration:**
 
-5. **Configure the user-level MCP server:**
-
-    - Open Command Palette
-    - Run: **MCP: Open User Configuration**
     - Add your server there:
  
       ```json
@@ -90,13 +88,15 @@ Once the server is running, you can connect to it from MCP-compatible tools like
       }
       ```
 
-    - In the mcp.json editor tab:
-    - Click **Start** above your server block
-    - Wait for status to show **Running** and tools to be discovered
-
     > This is the equivalent of `.vscode/mcp.json`, but applies globally.
 
-    > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000`
+5. **Start the MCP server:**
+
+    - In the mcp.json editor tab:
+    - Click **Start** above your server block
+    - Wait for status to show **Running** and tools to be discovered  
+                                                                                                 
+  > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000`
 
 6. **Verify CSLA MCP tools are enabled**
 
