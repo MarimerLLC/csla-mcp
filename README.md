@@ -73,22 +73,36 @@ Once the server is running, you can connect to it from MCP-compatible tools like
 
 4. **Find "Chat > MCP: Servers"** and click "Edit in settings.json"
 
-5. **Add your MCP server configuration** to the `github.copilot.chat.mcp.servers` object:
+5. **Configure the user-level MCP server:**
 
-   ```json
-   {
-     "github.copilot.chat.mcp.servers": {
-       "csla-mcp": {
-         "type": "http",
-         "url": "http://localhost:8080/mcp"
-       }
-     }
-   }
-   ```
+    - Open Command Palette
+    - Run: **MCP: Open User Configuration**
+    - Add your server there:
+ 
+      ```json
+      {
+        "servers": {
+          "csla-mcp": {
+            "type": "http",
+            "url": "http://localhost:8080/"
+          }
+        }
+      }
+      ```
 
-   > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000/mcp`
+    - In the mcp.json editor tab:
+    - Click **Start** above your server block
+    - Wait for status to show **Running** and tools to be discovered
 
-6. **Restart VS Code** to apply the changes
+    > This is the equivalent of `.vscode/mcp.json`, but applies globally.
+
+    > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000/mcp`
+
+6. **Verify CSLA MCP tools are enabled**
+
+    - In the Copilot Chat window, click "Configure Tools"
+    - In the list, visually confirm that **csla-mcp** is listed and checked
+    - This ensures the CSLA MCP tools are available for chat sessions
 
 7. **Verify the connection**: Open GitHub Copilot Chat and you should now be able to use the CSLA MCP tools in your conversations. The server provides two tools:
    - `Search` - Search CSLA code examples and documentation
