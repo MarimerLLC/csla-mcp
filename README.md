@@ -84,7 +84,7 @@ Once the server is running, you can connect to it from MCP-compatible tools like
         "servers": {
           "csla-mcp": {
             "type": "http",
-            "url": "http://localhost:8080/"
+            "url": "http://localhost:8080"
           }
         }
       }
@@ -96,7 +96,7 @@ Once the server is running, you can connect to it from MCP-compatible tools like
 
     > This is the equivalent of `.vscode/mcp.json`, but applies globally.
 
-    > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000/mcp`
+    > **Note:** If you mapped the Docker container to a different port (e.g., `-p 9000:8080`), use that port in the URL: `http://localhost:9000`
 
 6. **Verify CSLA MCP tools are enabled**
 
