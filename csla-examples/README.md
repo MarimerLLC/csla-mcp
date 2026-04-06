@@ -94,6 +94,7 @@ External Links:
 
 - `Properties.md` - Property declaration patterns (major differences between versions)
 - `EditableRoot.md`, `EditableChild.md`, etc. - Complete stereotype implementations
+- `EditableDocument.md` - Editable document (properties + embedded child collection) pattern
 - `Command.md` - Command object patterns
 - `InjectAttribute.md` - Dependency injection patterns
 

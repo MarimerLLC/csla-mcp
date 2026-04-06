@@ -18,6 +18,7 @@ This document summarizes the primary object stereotypes supported by CSLA, their
 | **Read-only Child** | An object containing read-only properties; this object is contained within another object (typically a read-only root or read-only child list) and cannot be retrieved directly from the database independently. | `ReadOnlyBase<T>` |
 | **Read-only Root List** | A list object containing read-only child objects; this list can be retrieved directly from the database. It represents a collection of read-only business entities. | `ReadOnlyListBase<T,C>` or `ReadOnlyBindingListBase<T,C>` (for Windows Forms) |
 | **Read-only Child List** | A list object containing read-only child objects; this list is contained within another object and cannot be retrieved directly from the database independently. | `ReadOnlyListBase<T,C>` or `ReadOnlyBindingListBase<T,C>` (for Windows Forms) |
+| **Editable Document** | An object combining read-write properties with an embedded collection of editable child objects; can be a root or a child-that-is-a-parent. Eliminates the need for separate BusinessBase + BusinessListBase pairs. .NET 8+ only. | `BusinessDocumentBase<T,C>` |
 | **Name/Value List** | A specialized read-only list object containing key/value pairs, typically used for populating drop-down list controls or other selection mechanisms. | `NameValueListBase<K,V>` |
 
 ## Understanding the Purpose of Stereotypes
