@@ -104,9 +104,10 @@ Once the server is running, you can connect to it from MCP-compatible tools like
     - In the list, visually confirm that **csla-mcp** is listed and checked
     - This ensures the CSLA MCP tools are available for chat sessions
 
-7. **Verify the connection**: Open GitHub Copilot Chat and you should now be able to use the CSLA MCP tools in your conversations. The server provides two tools:
-   - `Search` - Search CSLA code examples and documentation
-   - `Fetch` - Retrieve specific code examples by filename
+7. **Verify the connection**: Open GitHub Copilot Chat and you should now be able to use the CSLA MCP tools in your conversations. The server provides three tools:
+   - `search` - Search CSLA code examples and documentation
+   - `fetch` - Retrieve specific code examples by filename
+   - `version` - Return the running server version
 
 ### Testing the Connection
 
@@ -269,18 +270,21 @@ The server loads pre-generated embeddings from `embeddings.json` in the applicat
 
 ## MCP Tools
 
-The server currently exposes two MCP tools implemented in the `CslaCodeTool` class:
+The server currently exposes three MCP tools implemented in the `CslaCodeTool` class:
 
-- `Search` — search code samples and markdown snippets for keyword matches and return scored results.
-- `Fetch` — return the raw content of a named code sample or markdown file.
+- `search` — search code samples and markdown snippets for keyword matches and return scored results.
+- `fetch` — return the raw content of a named code sample or markdown file.
+- `version` — return the running server version string.
 
-Both tools operate over the repository folder that contains the example files. By default, this is `../csla-examples` relative to the server executable, but this can be configured using:
+> ℹ️ **Tool names are lowercase on the wire.** Although the underlying C# methods are named `Search`, `Fetch`, and `Version`, the MCP SDK exposes them with a lowercase first letter. When invoking tools directly (for example via `tools/call` or the MCP Inspector CLI), use `search`, `fetch`, and `version`. Calling `Search` returns `-32602 Unknown tool: 'Search'`.
+
+The `search` and `fetch` tools operate over the repository folder that contains the example files. By default, this is `../csla-examples` relative to the server executable, but this can be configured using:
 
 - The `--folder` or `-f` command-line option
 - The `CSLA_CODE_SAMPLES_PATH` environment variable
 - When running from the repository root, the default resolves to `csla-examples/`
 
-### Tool: Search
+### Tool: search
 
 Description: Extracts significant words from the provided input text and searches `.cs` and `.md` files under the examples folder for occurrences of those words. Returns a JSON array of consolidated search results that merge semantic (vector-based) and word-based (keyword) search scores.
 
@@ -302,7 +306,7 @@ Example call (MCP `tools/call`):
 {
   "method": "tools/call",
   "params": {
-    "name": "Search",
+    "name": "search",
     "arguments": { 
       "message": "data portal authorization business object",
       "version": 10
@@ -317,7 +321,7 @@ Example call without version (uses highest available):
 {
   "method": "tools/call",
   "params": {
-    "name": "Search",
+    "name": "search",
     "arguments": { 
       "message": "read-write property editable root"
     }
@@ -335,7 +339,7 @@ Notes and behavior:
 - Results are ordered by `Score` descending, then by filename.
 - Version filtering: Files in version subdirectories (e.g., `v9/`, `v10/`) are filtered by the specified version. Files in the root directory are considered common to all versions and are always included.
 
-### Tool: Fetch
+### Tool: fetch
 
 Description: Returns the text contents of a specific file from the configured code samples folder by file name.
 
@@ -351,7 +355,7 @@ Example call (MCP `tools/call`):
 {
   "method": "tools/call",
   "params": {
-    "name": "Fetch",
+    "name": "fetch",
     "arguments": { "fileName": "v10/ReadOnlyProperty.md" }
   }
 }
@@ -360,6 +364,26 @@ Example call (MCP `tools/call`):
 Security note:
 
 - The implementation validates file paths to prevent path traversal attacks. Only files within the configured code samples directory can be accessed. Relative paths like `../` or absolute paths are rejected.
+
+### Tool: version
+
+Description: Returns the running server's version string, read from the assembly's informational version (e.g., `1.0.0+<commit-sha>`). Useful for confirming which build a client is connected to.
+
+Parameters: none.
+
+Output: A plain version string.
+
+Example call (MCP `tools/call`):
+
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "version",
+    "arguments": {}
+  }
+}
+```
 
 ## Integration with AI Assistants
 
