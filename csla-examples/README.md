@@ -45,6 +45,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | `BusinessRulesObjectLevel.md` | Object-level validation rules |
 | `BusinessRulesPriority.md` | Rule execution priority |
 | `BusinessRulesUnitTesting.md` | Unit testing rules with Rocks mocking framework |
+| `PolymorphicChildList.md` | `BusinessListBase` holding polymorphic (heterogeneous) child types via a CRTP base and shared interface |
 
 ### Data Portal Operation Documents
 
