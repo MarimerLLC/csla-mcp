@@ -8,7 +8,7 @@ EXPOSE 8080
 EXPOSE 8081
 
 
-# This stage is used to build the service project
+# This stage builds the csla-mcp-server project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 ARG VERSION=1.0.0
@@ -19,18 +19,37 @@ COPY . .
 WORKDIR "/src/csla-mcp-server"
 RUN dotnet build "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/build /p:InformationalVersion=$VERSION
 
-# This stage is used to publish the service project to be copied to the final stage
+
+# This stage publishes the service project
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 ARG VERSION=1.0.0
 RUN dotnet publish "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:InformationalVersion=$VERSION
 
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+
+# This stage generates the embeddings file
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS embeddings-generator
+ARG SKIP_EMBEDDINGS=true
+ARG AZURE_OPENAI_ENDPOINT
+ARG AZURE_OPENAI_API_KEY
+ENV AZURE_OPENAI_ENDPOINT=$AZURE_OPENAI_ENDPOINT
+ENV AZURE_OPENAI_API_KEY=$AZURE_OPENAI_API_KEY
+WORKDIR /src
+COPY csla-embeddings-generator/ ./csla-embeddings-generator/
+COPY csla-examples/ ./csla-examples/
+RUN if [ "$SKIP_EMBEDDINGS" = "false" ]; then \
+      dotnet restore "./csla-embeddings-generator/csla-embeddings-generator.csproj" && \
+      dotnet build "./csla-embeddings-generator/csla-embeddings-generator.csproj" -c Release -o /app/embeddings-build && \
+      dotnet run --project "./csla-embeddings-generator/csla-embeddings-generator.csproj" --configuration Release -- --examples-path /src/csla-examples --output /embeddings.json; \
+    fi
+RUN if [ ! -f /embeddings.json ]; then echo "[]" > /embeddings.json; fi
+
+
+# This stage is used in production or when running from VS in regular mode
 FROM base AS final
 WORKDIR /
 COPY --from=build /src/csla-examples /csla-examples
 WORKDIR /app
 COPY --from=publish /app/publish .
-# Copy pre-generated embeddings (created by build.sh script)
-COPY embeddings.json ./embeddings.json
+COPY --from=embeddings-generator /embeddings.json ./embeddings.json
 ENTRYPOINT ["dotnet", "csla-mcp-server.dll"]
