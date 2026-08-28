@@ -14,6 +14,16 @@ The CSLA MCP Server provides AI coding assistants with access to official CSLA .
 - **Aspire Integration**: Built with .NET Aspire for modern cloud-native development
 - **HTTP API**: RESTful API endpoints for easy integration
 
+## Protocol Version
+
+This server implements the **2026-07-28 revision of the MCP specification** (MCP 2.0) using the official [C# SDK v2.0](https://github.com/modelcontextprotocol/csharp-sdk).
+
+Key characteristics:
+
+- **Stateless by default**: No `initialize` handshake or `Mcp-Session-Id` session affinity is required. Any request can be handled by any server instance, so the server scales horizontally behind an ordinary load balancer with no sticky sessions.
+- **Dual-era compatibility**: v2 clients use the new `server/discover` flow (no handshake). Legacy v1 clients (e.g., current VS Code + GitHub Copilot) automatically fall back to the legacy `initialize` handshake — no client changes are required.
+- **Standardized HTTP headers**: v2 requests carry `Mcp-Method` and `Mcp-Name` headers (e.g., `Mcp-Method: tools/call`, `Mcp-Name: search`), so gateways, load balancers, and WAFs can route and authorize MCP traffic without inspecting the request body.
+
 ## Deployment
 
 This project made public via a container image file that you can host.

@@ -11,7 +11,7 @@ EXPOSE 8081
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
-ARG VERSION=1.0.0
+ARG VERSION=2.0.0
 WORKDIR /src
 COPY ["csla-mcp-server/csla-mcp-server.csproj", "csla-mcp-server/"]
 RUN dotnet restore "./csla-mcp-server/csla-mcp-server.csproj"
@@ -22,7 +22,7 @@ RUN dotnet build "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/buil
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-ARG VERSION=1.0.0
+ARG VERSION=2.0.0
 RUN dotnet publish "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:InformationalVersion=$VERSION
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
