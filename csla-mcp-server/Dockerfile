@@ -11,7 +11,7 @@ EXPOSE 8081
 # This stage builds the csla-mcp-server project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
-ARG VERSION=1.0.0
+ARG VERSION=2.0.0
 WORKDIR /src
 COPY ["csla-mcp-server/csla-mcp-server.csproj", "csla-mcp-server/"]
 RUN dotnet restore "./csla-mcp-server/csla-mcp-server.csproj"
@@ -23,7 +23,7 @@ RUN dotnet build "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/buil
 # This stage publishes the service project
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-ARG VERSION=1.0.0
+ARG VERSION=2.0.0
 RUN dotnet publish "./csla-mcp-server.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false /p:InformationalVersion=$VERSION
 
 

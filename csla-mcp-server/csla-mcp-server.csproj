@@ -7,17 +7,17 @@
     <RootNamespace>CslaMcpServer</RootNamespace>
     <UserSecretsId>6e72be26-bc88-4873-b3a7-b85f4b5124e9</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    <Version>1.0.0</Version>
-    <InformationalVersion>1.0.0</InformationalVersion>
+    <Version>2.0.0</Version>
+    <InformationalVersion>2.0.0</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0-rc.1.25451.107" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-    <PackageReference Include="ModelContextProtocol" Version="0.7.0-preview.1" />
-    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="0.7.0-preview.1" />
-    <PackageReference Include="ModelContextProtocol.Core" Version="0.7.0-preview.1" />
+    <PackageReference Include="ModelContextProtocol" Version="2.0.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.0.0" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.0.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.12.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.12.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.12.0" />
