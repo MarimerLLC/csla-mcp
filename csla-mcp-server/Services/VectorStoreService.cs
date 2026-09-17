@@ -12,7 +12,15 @@ namespace CslaMcpServer.Services
     private readonly AzureOpenAIClient _openAIClient;
     private readonly Dictionary<string, DocumentEmbedding> _vectorStore;
     private readonly string _embeddingModelName;
+    private readonly float _minSimilarity;
     private bool _isHealthy = true;
+
+    /// <summary>
+    /// Default minimum cosine similarity for a document to count as a semantic match.
+    /// text-embedding-3-large typically scores short queries against whole documents
+    /// in the 0.3-0.5 range, so higher cutoffs discard relevant matches.
+    /// </summary>
+    public const float DefaultMinSimilarity = 0.3f;
 
     public class DocumentEmbedding
     {
@@ -28,7 +36,7 @@ namespace CslaMcpServer.Services
       public float SimilarityScore { get; set; }
     }
 
-    public VectorStoreService(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-large", string apiVersion = "2024-02-01")
+    public VectorStoreService(string azureOpenAIEndpoint, string azureOpenAIApiKey, string embeddingModelName = "text-embedding-3-large", string apiVersion = "2024-02-01", float minSimilarity = DefaultMinSimilarity)
     {
       // Use the latest available service version as default
       var clientOptions = new AzureOpenAIClientOptions();
@@ -36,8 +44,10 @@ namespace CslaMcpServer.Services
       _openAIClient = new AzureOpenAIClient(new Uri(azureOpenAIEndpoint), new AzureKeyCredential(azureOpenAIApiKey), clientOptions);
       _vectorStore = new Dictionary<string, DocumentEmbedding>();
       _embeddingModelName = embeddingModelName;
-      
+      _minSimilarity = minSimilarity;
+
       Console.WriteLine($"[VectorStore] Initialized with API version: {apiVersion} (using default client options)");
+      Console.WriteLine($"[VectorStore] Minimum similarity for semantic matches: {_minSimilarity}");
     }
 
     public async Task<bool> TestConnectivityAsync()
@@ -212,7 +222,7 @@ namespace CslaMcpServer.Services
         var topResults = results
           .OrderByDescending(r => r.SimilarityScore)
           .Take(topK)
-          .Where(r => r.SimilarityScore > 0.5f) // Filter out low similarity scores
+          .Where(r => r.SimilarityScore > _minSimilarity) // Filter out low similarity scores
           .ToList();
 
         Console.WriteLine($"[VectorStore] Found {topResults.Count} semantic matches for version {version}");

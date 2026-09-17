@@ -138,6 +138,7 @@ The server uses Azure OpenAI for vector embeddings to provide semantic search ca
 
 - `AZURE_OPENAI_EMBEDDING_MODEL`: The embedding model deployment name to use (default: `text-embedding-3-large`)
 - `AZURE_OPENAI_API_VERSION`: The API version to use (default: `2024-02-01`)
+- `SEMANTIC_SEARCH_MIN_SIMILARITY`: Minimum cosine similarity (0–1) for a document to be returned as a semantic match (default: `0.3`). With `text-embedding-3-large`, short queries typically score 0.3–0.5 against relevant documents, so raising this much above `0.45` can filter out all semantic results.
 
 #### ⚠️ Important: Model Deployment Required
 
@@ -298,8 +299,8 @@ Parameters:
 Output: JSON array of objects with the shape:
 
 - `FileName` (string): relative file path from the examples folder (e.g., `v10/ReadOnlyProperty.md` or `CommonFile.cs`)
-- `Score` (double): normalized combined score (0.0 to 1.0) from semantic and word searches
-- `VectorScore` (double, nullable): semantic similarity score from Azure OpenAI embeddings (null if semantic search unavailable)
+- `Score` (double): combined score (0.0 to 1.0). When semantic search returns matches, this is the average of the vector score (normalized so the best semantic match is 1.0) and `WordScore`, with a missing score counted as 0, so files matching both ways rank highest. In keyword-only mode it equals `WordScore`.
+- `VectorScore` (double, nullable): raw cosine similarity from Azure OpenAI embeddings (null if semantic search is unavailable or the file scored at or below `SEMANTIC_SEARCH_MIN_SIMILARITY`)
 - `WordScore` (double, nullable): normalized keyword match score (null if no keyword matches found)
 
 Example call (MCP `tools/call`):
