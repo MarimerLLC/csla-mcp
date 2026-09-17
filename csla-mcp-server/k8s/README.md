@@ -25,7 +25,7 @@ How to use
    Or set the image to your registry tag, for example:
 
    ```yaml
-   image: myregistry.example.com/marimerllc/csla-mcp-server:1.0.0
+   image: myregistry.example.com/marimerllc/csla-mcp-server:2.0.0
    ```
 
    Pushing to Docker Hub

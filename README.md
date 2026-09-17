@@ -278,6 +278,8 @@ The server currently exposes three MCP tools implemented in the `CslaCodeTool` c
 
 > ℹ️ **Tool names are lowercase on the wire.** Although the underlying C# methods are named `Search`, `Fetch`, and `Version`, the MCP SDK exposes them with a lowercase first letter. When invoking tools directly (for example via `tools/call` or the MCP Inspector CLI), use `search`, `fetch`, and `version`. Calling `Search` returns `-32602 Unknown tool: 'Search'`.
 
+> ℹ️ **Transport and protocol versions.** The server uses the Streamable HTTP transport at the root URL (`POST /`) in stateless mode, built on the [MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk) 2.x. It serves clients using the `2026-07-28` protocol (discovery via `server/discover`, no handshake or session) as well as older clients that use the `initialize` handshake (`2025-11-25` and earlier). The legacy SSE transport (`/sse`) is not supported, and a `GET /` returns `405`.
+
 The `search` and `fetch` tools operate over the repository folder that contains the example files. By default, this is `../csla-examples` relative to the server executable, but this can be configured using:
 
 - The `--folder` or `-f` command-line option
@@ -367,7 +369,7 @@ Security note:
 
 ### Tool: version
 
-Description: Returns the running server's version string, read from the assembly's informational version (e.g., `1.0.0+<commit-sha>`). Useful for confirming which build a client is connected to.
+Description: Returns the running server's version string, read from the assembly's informational version (e.g., `2.0.0+<commit-sha>`). Useful for confirming which build a client is connected to.
 
 Parameters: none.
 
