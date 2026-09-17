@@ -8,7 +8,7 @@ LOCAL_IMAGE="csla-mcp-server:${TAG}"
 REMOTE_IMAGE="${DOCKERHUB_USER}/csla-mcp-server:${TAG}"
 
 if ! docker image inspect "${LOCAL_IMAGE}" >/dev/null 2>&1; then
-  echo "Local image '${LOCAL_IMAGE}' not found. Build it first with ./build-image.sh"
+  echo "Local image '${LOCAL_IMAGE}' not found. Build it first with ./build.sh"
   exit 1
 fi
 
