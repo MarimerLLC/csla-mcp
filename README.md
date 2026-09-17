@@ -369,7 +369,7 @@ Security note:
 
 ### Tool: version
 
-Description: Returns the running server's version string, read from the assembly's informational version (e.g., `1.0.0+<commit-sha>`). Useful for confirming which build a client is connected to.
+Description: Returns the running server's version string, read from the assembly's informational version (e.g., `2.0.0+<commit-sha>`). Useful for confirming which build a client is connected to.
 
 Parameters: none.
 

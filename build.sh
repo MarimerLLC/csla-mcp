@@ -16,10 +16,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Generate version string: 1.0.0+YYYYMMDD.githash
+# Generate version string: 2.0.0+YYYYMMDD.githash
 BUILD_DATE=$(date -u +%Y%m%d)
 GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "nogit")
-VERSION="1.0.0+${BUILD_DATE}.${GIT_HASH}"
+VERSION="2.0.0+${BUILD_DATE}.${GIT_HASH}"
 echo "Building with version: $VERSION"
 
 # Build the Docker container with the embeddings.json file and version embedded in assembly
