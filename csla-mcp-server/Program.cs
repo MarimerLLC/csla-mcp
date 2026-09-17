@@ -7,6 +7,7 @@ using Spectre.Console.Cli;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Csla.Configuration;
+using ModelContextProtocol.AspNetCore;
 
 public sealed class AppSettings : CommandSettings
 {
@@ -189,9 +190,11 @@ public sealed class RunCommand : Command<AppSettings>
         builder.Services.AddMcpServer()
             .WithHttpTransport(options =>
             {
-                // Use stateless mode to avoid "Session not found" errors (-32001)
-                // This is appropriate for tools like search that don't require session state
-                options.Stateless = true;
+                // Stateless is the SDK default, but set it explicitly: the tools don't need
+                // session state, and no sessions means no "Session not found" errors across
+                // restarts or scaled-out instances. Legacy (initialize handshake) clients and
+                // 2026-07-28 protocol clients are both served statelessly.
+                options.SessionMode = HttpServerSessionMode.Stateless;
             })
             .WithTools<CslaCodeTool>();
 
