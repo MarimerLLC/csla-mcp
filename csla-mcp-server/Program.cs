@@ -111,7 +111,21 @@ public sealed class RunCommand : Command<AppSettings>
         var azureOpenAIApiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
         var embeddingModel = Environment.GetEnvironmentVariable("AZURE_OPENAI_EMBEDDING_MODEL") ?? "text-embedding-3-large";
         var apiVersion = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_VERSION") ?? "2024-02-01";
-        
+        var minSimilarity = VectorStoreService.DefaultMinSimilarity;
+        var minSimilarityEnv = Environment.GetEnvironmentVariable("SEMANTIC_SEARCH_MIN_SIMILARITY");
+        if (!string.IsNullOrWhiteSpace(minSimilarityEnv))
+        {
+            if (float.TryParse(minSimilarityEnv, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+                && parsed >= 0f && parsed <= 1f)
+            {
+                minSimilarity = parsed;
+            }
+            else
+            {
+                Console.WriteLine($"[Startup] Warning: SEMANTIC_SEARCH_MIN_SIMILARITY '{minSimilarityEnv}' is not a number between 0 and 1; using default {minSimilarity}.");
+            }
+        }
+
         VectorStoreService? vectorStore = null;
         
         if (string.IsNullOrWhiteSpace(azureOpenAIEndpoint) || string.IsNullOrWhiteSpace(azureOpenAIApiKey))
@@ -130,7 +144,7 @@ public sealed class RunCommand : Command<AppSettings>
             
             try
             {
-                vectorStore = new VectorStoreService(azureOpenAIEndpoint, azureOpenAIApiKey, embeddingModel, apiVersion);
+                vectorStore = new VectorStoreService(azureOpenAIEndpoint, azureOpenAIApiKey, embeddingModel, apiVersion, minSimilarity);
                 Console.WriteLine("[Startup] Vector store initialized successfully - semantic search enabled.");
             }
             catch (Exception ex)

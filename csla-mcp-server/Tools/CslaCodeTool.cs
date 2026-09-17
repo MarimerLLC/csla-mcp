@@ -171,8 +171,14 @@ namespace CslaMcpServer.Tools
       logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Starting result consolidation");
       
       var consolidatedResults = new Dictionary<string, ConsolidatedSearchResult>();
-      
-      // Add semantic matches
+
+      // Word scores are already max-normalized to 0..1, but raw cosine similarities from
+      // text-embedding-3-large cluster around 0.3-0.5. Normalize vector scores the same way
+      // so the two are on a comparable scale before combining.
+      var maxVectorScore = semanticMatches.Count > 0 ? semanticMatches.Max(s => (double)s.SimilarityScore) : 0.0;
+      var useSemantic = maxVectorScore > 0;
+
+      // Add semantic matches (VectorScore keeps the raw similarity for transparency)
       foreach (var semantic in semanticMatches)
       {
         if (!consolidatedResults.ContainsKey(semantic.FileName))
@@ -181,36 +187,45 @@ namespace CslaMcpServer.Tools
           {
             FileName = semantic.FileName,
             VectorScore = semantic.SimilarityScore,
-            WordScore = null,
-            Score = semantic.SimilarityScore
+            WordScore = null
           };
         }
       }
-      
+
       // Add word matches and merge with semantic matches
       foreach (var word in wordMatches)
       {
-        if (consolidatedResults.ContainsKey(word.FileName))
+        if (consolidatedResults.TryGetValue(word.FileName, out var existing))
         {
-          // File exists in both - calculate average
-          var existing = consolidatedResults[word.FileName];
           existing.WordScore = word.Score;
-          existing.Score = (existing.VectorScore.GetValueOrDefault(0) + word.Score) / 2.0;
-          logger.LogInformation("[CslaCodeTool.ConsolidateSearchResults] Merged scores for '{File}': Vector={Vector:F3}, Word={Word:F3}, Average={Avg:F3}", word.FileName, existing.VectorScore, existing.WordScore, existing.Score);
         }
         else
         {
-          // File only in word matches
           consolidatedResults[word.FileName] = new ConsolidatedSearchResult
           {
             FileName = word.FileName,
             VectorScore = null,
-            WordScore = word.Score,
-            Score = word.Score
+            WordScore = word.Score
           };
         }
       }
-      
+
+      // When semantic search contributed, score = average of normalized vector and word scores,
+      // counting a missing score as 0 so files matched both ways rank above single-source matches.
+      // In keyword-only mode the score is just the word score.
+      foreach (var result in consolidatedResults.Values)
+      {
+        if (useSemantic)
+        {
+          var normalizedVector = result.VectorScore.HasValue ? result.VectorScore.Value / maxVectorScore : 0.0;
+          result.Score = (normalizedVector + result.WordScore.GetValueOrDefault(0)) / 2.0;
+        }
+        else
+        {
+          result.Score = result.WordScore.GetValueOrDefault(0);
+        }
+      }
+
       // Sort by score descending, then by filename
       var sortedResults = consolidatedResults.Values
         .OrderByDescending(r => r.Score)
