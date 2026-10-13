@@ -291,6 +291,8 @@ The business layer consists of domain objects built using CSLA stereotypes. Thes
 </Project>
 ```
 
+> **CSLA 11:** CSLA 11 targets `net10.0` and `net11.0` (plus `netstandard2.0` and `net462` through `net48`); .NET 8 and .NET 9 are no longer supported. The source generators are bundled in the `Csla` package, so reference only `Csla` (for example `<PackageReference Include="Csla" Version="11.0.0" />`). The `Csla.Generator.AutoImplementProperties.CSharp` package is retired, and a build error (`CSLABUILD001`) is reported while a reference to it remains. Declare business classes that have data portal operation methods `partial` (analyzer CSLA0024).
+
 **Example Editable Root Business Object:**
 
 ```csharp
@@ -303,32 +305,21 @@ namespace MyApp.Business;
 [CslaImplementProperties]
 public partial class PersonEdit : BusinessBase<PersonEdit>
 {
-    [Create]
-    [Fetch]
-    public static readonly PropertyInfo<int> IdProperty = RegisterProperty<int>(nameof(Id));
+    // The generator creates IdProperty, NameProperty, etc. for each partial property
     public partial int Id { get; private set; }
 
-    [Create]
-    [Fetch]
     [Required]
     [StringLength(100)]
-    public static readonly PropertyInfo<string> NameProperty = RegisterProperty<string>(nameof(Name));
     public partial string Name { get; set; }
 
-    [Create]
-    [Fetch]
     [EmailAddress]
-    public static readonly PropertyInfo<string> EmailProperty = RegisterProperty<string>(nameof(Email));
     public partial string Email { get; set; }
 
-    [Create]
-    [Fetch]
-    public static readonly PropertyInfo<decimal> SalaryProperty = RegisterProperty<decimal>(nameof(Salary));
     public partial decimal Salary { get; set; }
 
     // Object-level authorization
     [ObjectAuthorizationRules]
-    private static void AddObjectAuthorizationRules()
+    public static void AddObjectAuthorizationRules()
     {
         Csla.Rules.BusinessRules.AddRule(
             typeof(PersonEdit),

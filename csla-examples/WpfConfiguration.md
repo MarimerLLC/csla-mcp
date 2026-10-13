@@ -257,6 +257,6 @@ builder.Services.AddCsla(options => options
 2. **Use a host builder** - Configure your application using the `IHostBuilder` for a modern, DI-first approach.
 3. **Use `PropertyStatus`** - Leverage the `PropertyStatus` control to simplify displaying property-level information to the user.
 4. **Use async methods** - Prefer `FetchAsync`, `SaveAsync`, etc. for a responsive user interface.
-5. **Handle validation** - Check `IsSavable` before calling `SaveAsync()`.
+5. **Handle validation** - Check `IsSavable` before calling `SaveAsync()`. In CSLA 11, `IsSavable` can be `false` while an async per-type authorization rule is running (the object is busy); it raises `PropertyChanged` for `IsSavable` when the rule completes, so bind to it rather than reading it once.
 6. **Register DAL services** - Use dependency injection for data access layer components if using the local data portal.
 

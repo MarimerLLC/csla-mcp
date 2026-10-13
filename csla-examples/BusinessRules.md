@@ -140,13 +140,13 @@ context.AddInformationResult("Just FYI");           // Information - no action n
 BusinessRules.AddRule(new Required(EmailProperty) { Priority = -1 });
 
 // Priority 0: Check format (only if Required passed)
-BusinessRules.AddRule(new Email(EmailProperty));
+BusinessRules.AddRule(new RegExMatch(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$"));
 
-// Priority 1: Check uniqueness (only if Email format passed)
+// Priority 1: Check uniqueness (only if the format check passed)
 BusinessRules.AddRule(new UniqueEmailAsync(EmailProperty) { Priority = 1 });
 ```
 
-If `EmailProperty` is empty, only the `Required` rule runs. The `Email` and `UniqueEmailAsync` rules don't execute because `Required` returned an Error.
+If `EmailProperty` is empty, only the `Required` rule runs. The `RegExMatch` and `UniqueEmailAsync` rules don't execute because `Required` returned an Error.
 
 See [BusinessRulesPriority.md](BusinessRulesPriority.md) for detailed information on priorities and short-circuiting.
 
@@ -157,7 +157,7 @@ See [BusinessRulesPriority.md](BusinessRulesPriority.md) for detailed informatio
 ```csharp
 BusinessRules.AddRule(new Required(NameProperty));
 BusinessRules.AddRule(new MaxLength(NameProperty, 50));
-BusinessRules.AddRule(new RegEx(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$"));
+BusinessRules.AddRule(new RegExMatch(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$"));
 ```
 
 ### Multi-Property Validation
@@ -169,7 +169,7 @@ BusinessRules.AddRule(new LessThan(StartDateProperty, EndDateProperty));
 ### Calculation
 
 ```csharp
-BusinessRules.AddRule(new CalcSum(TotalProperty, Subtotal Property, TaxProperty));
+BusinessRules.AddRule(new CalcSum(TotalProperty, SubtotalProperty, TaxProperty));
 ```
 
 ### Conditional Validation
@@ -215,8 +215,10 @@ CSLA provides many built-in rules in the `Csla.Rules.CommonRules` namespace:
 - `MinLength` - String length minimum
 - `MaxValue<T>` - Maximum numeric value
 - `MinValue<T>` - Minimum numeric value
-- `RegEx` - Regular expression pattern match
-- `Range<T>` - Value must be within a range
+- `RegExMatch` - Regular expression pattern match
+- `DataAnnotation` - Wraps a `System.ComponentModel.DataAnnotations` attribute (use `[Range]` for range checks)
+- `Lambda` - Inline rule implemented with a lambda expression
+- `InfoMessage` - Adds an informational message
 - `Dependency` - Establishes property dependencies
 - `IsInRole` - Authorization based on user roles
 - `IsNotInRole` - Authorization preventing certain roles
@@ -274,6 +276,6 @@ public class Order : BusinessBase<Order>
 
 - Rules execute automatically when properties change via `SetProperty()`
 - Rules do not execute when using `LoadProperty()` (typically used in data portal methods)
-- Use `BusinessRules.CheckRules()` (CSLA 9) or `await CheckRulesAsync()` (CSLA 10) to manually trigger rule execution
+- Use `BusinessRules.CheckRules()` or `await BusinessRules.CheckRulesAsync()` (recommended when any rules are async) to manually trigger rule execution
 - Async rules run in the background and complete asynchronously
 - Rule results are cached - rules only re-execute when input properties change

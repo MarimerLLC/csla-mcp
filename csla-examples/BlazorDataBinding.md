@@ -83,6 +83,8 @@ The `ViewModel<T>` class is the foundation for Blazor pages that edit CSLA busin
 | `CanEditObject` | `bool` | User can edit/save instances |
 | `CanDeleteObject` | `bool` | User can delete instances |
 
+> **CSLA 11:** These properties are evaluated with `BusinessRules.HasPermissionAsync`, so async (`IAuthorizationRuleAsync`) per-type rules are supported; `RefreshAsync` awaits them. In CSLA 10 and earlier, an async per-type rule makes these getters throw.
+
 ### Key Methods
 
 | Method | Description |
@@ -1006,7 +1008,7 @@ else
 1. **Always call `StateManager.InitializeAsync()` first** in `OnInitializedAsync()`
 2. **Wire up `ModelPropertyChanged`** to trigger UI refresh when properties change
 3. **Use `GetPropertyInfo()`** for metastate-driven data binding with authorization and validation
-4. **Check `IsSavable` before enabling Save** - this ensures all validation passes
+4. **Check `IsSavable` before enabling Save** - this ensures all validation passes (in CSLA 11, `IsSavable` is `false` and the model is busy while an async `CreateObject`/`EditObject`/`DeleteObject` authorization rule runs; `ModelPropertyChanged` fires when it completes, and `SaveAsync` waits for it)
 5. **Display `ViewModelErrorText`** prominently to show operation errors
 6. **Use authorization properties** (`CanEditObject`, etc.) to conditionally render UI
 7. **Create reusable input components** that accept `Csla.Blazor.IPropertyInfo` for consistency

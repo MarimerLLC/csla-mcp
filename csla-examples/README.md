@@ -8,7 +8,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 1. **Start with Search** - Use the `search` tool with natural language queries like "editable root save" or "async business rule" to find relevant documents
 2. **Fetch the Best Matches** - Use the `fetch` tool to retrieve the content of high-scoring documents from search results
-3. **Check Version** - If your search doesn't specify a version, the server defaults to the highest version available (currently v10). Specify `version: 9` if you need CSLA 9-specific patterns
+3. **Check Version** - If your search doesn't specify a version, the server defaults to the highest version available (currently v11). Specify `version: 10` or `version: 9` if you need patterns for an earlier CSLA version
 
 ### Recommended Workflow
 
@@ -45,6 +45,8 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | `BusinessRulesObjectLevel.md` | Object-level validation rules |
 | `BusinessRulesPriority.md` | Rule execution priority |
 | `BusinessRulesUnitTesting.md` | Unit testing rules with Rocks mocking framework |
+| `ObjectFactory.md` | ObjectFactory data portal model: `[ObjectFactory]`, factory classes, criteria and `[Inject]` parameters |
+| `CslaTesting.md` | `Csla.Testing` package: test host, `AddCslaTesting`, rule testing helpers, `RuleCache` |
 | `PolymorphicChildList.md` | `BusinessListBase` holding polymorphic (heterogeneous) child types via a CRTP base and shared interface |
 
 ### Data Portal Operation Documents
@@ -66,6 +68,8 @@ This folder contains documentation and code examples for the CSLA .NET framework
 | `HttpDataPortalConfiguration.md` | HTTP channel configuration for remote data portal |
 | `GrpcDataPortalConfiguration.md` | gRPC channel configuration |
 | `RabbitMqDataPortalConfiguration.md` | RabbitMQ channel configuration |
+| `WcfDataPortalConfiguration.md` | WCF channel configuration |
+| `AvaloniaConfiguration.md` | Avalonia-specific CSLA configuration |
 | `CustomSerializers.md` | Custom serialization configuration |
 
 ### Extension Points
@@ -80,11 +84,12 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 ### Version-Specific Documentation
 
-The `v9/` and `v10/` subdirectories contain version-specific implementation details:
+The `v9/`, `v10/` and `v11/` subdirectories contain version-specific implementation details:
 
 | Folder | CSLA Version | Key Differences |
 | -------- | -------------- | ----------------- |
-| `v10/` | CSLA 10+ | Uses `[CslaImplementProperties]` for code generation, partial properties |
+| `v11/` | CSLA 11 | Targets .NET 10/11; source generators bundled in the `Csla` package; operation methods must have attributes (no `DataPortal_XYZ` name lookup); business classes should be `partial`; optional `[DataPortalExtensions]`; `AllowNew`/`AllowRemove` enforced |
+| `v10/` | CSLA 10.x | Uses `[CslaImplementProperties]` for code generation, partial properties |
 | `v9/` | CSLA 9.x | Manual property implementation with `GetProperty`/`SetProperty` |
 
 External Links:
@@ -98,6 +103,14 @@ External Links:
 - `EditableDocument.md` - Editable document (properties + embedded child collection) pattern
 - `Command.md` - Command object patterns
 - `InjectAttribute.md` - Dependency injection patterns
+
+**CSLA 11-only documents (`v11/`):**
+
+- `UpgradingToCsla11.md` - Breaking changes and migration steps from CSLA 10 to CSLA 11
+- `DataPortalExtensions.md` - `[DataPortalExtensions]` strongly typed data portal extension methods
+- `DataPortalOperationDispatch.md` - Generated `IDataPortalOperations` dispatch and why classes should be `partial`
+- `TransactionScopeFactory.md` - `[Transactional]`, `DataOptions` transaction defaults and `ITransactionScopeFactory`
+- `Analyzers.md` - CSLA analyzer and generator diagnostics reference (CSLA0002-CSLA0025, CSLADP002-CSLADP011)
 
 ## Document Relationships
 
@@ -150,6 +163,8 @@ External Links:
 - "authorization rule property" - Find property-level authorization
 - "command execute server" - Find command object patterns
 - "custom data portal channel" - Find channel implementation guidance
+- "upgrade to CSLA 11" - Find migration guidance for breaking changes
+- "strongly typed data portal extension methods" - Find `[DataPortalExtensions]` usage
 
 **The search combines:**
 
@@ -164,11 +179,11 @@ Some concepts appear in multiple documents at different levels of detail:
 | Concept | Quick Reference | Detailed Coverage |
 | --------- | ----------------- | ------------------- |
 | Solution Architecture | `Glossary.md` | `SolutionArchitecture.md` |
-| Stereotypes | `Glossary.md` | `ObjectStereotypes.md`, `v10/*.md` |
+| Stereotypes | `Glossary.md` | `ObjectStereotypes.md`, `v11/*.md`, `v10/*.md` |
 | Data Portal Operations | `Glossary.md` | `DataPortalGuide.md`, `DataPortalOperation*.md` |
 | Data Access Models | `Glossary.md` | `SolutionArchitecture.md`, `DataPortalGuide.md`, `Data-Access.md` |
 | Business Rules | `Glossary.md` | `BusinessRules*.md` |
-| Properties | `Glossary.md` | `v10/Properties.md`, `v9/Properties.md` |
+| Properties | `Glossary.md` | `v11/Properties.md`, `v10/Properties.md`, `v9/Properties.md` |
 
 This intentional overlap allows:
 

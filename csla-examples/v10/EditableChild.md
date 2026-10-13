@@ -48,8 +48,8 @@ namespace MyApp.Business
             
             // Property-level authorization rule
             BusinessRules.AddRule(
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.WriteProperty, 
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.WriteProperty, 
                     PriceProperty, 
                     "Manager", "Admin"));
         }

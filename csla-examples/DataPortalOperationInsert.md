@@ -2,6 +2,8 @@
 
 The `[Insert]` operation persists a new business object to a data source. This is invoked automatically when calling `SaveAsync()` on a new object.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Insert]`. A method named `DataPortal_Insert` without the attribute is never called. Declare the business class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## When to Use
 
 - Saving new editable root objects (`BusinessBase<T>`) to the database
@@ -81,7 +83,7 @@ Capture created by/date information:
 
 ```csharp
 [Insert]
-private async Task Insert([Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task Insert([Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     var currentUser = appContext.User.Identity.Name;
     var now = DateTime.UtcNow;
@@ -126,9 +128,10 @@ private async Task Insert([Inject] IOrderDal dal)
     var result = await dal.InsertAsync(data);
     LoadProperty(IdProperty, result.Id);
     
-    // Now insert children (they need parent ID)
-    var items = ReadProperty(ItemsProperty);
-    await FieldManager.UpdateChildrenAsync(items);
+    // Now insert children (they need parent ID). UpdateChildrenAsync cascades
+    // to every child; any arguments you pass are forwarded to the children's
+    // [InsertChild]/[UpdateChild]/[DeleteSelfChild] methods.
+    await FieldManager.UpdateChildrenAsync();
 }
 ```
 
@@ -139,4 +142,4 @@ private async Task Insert([Inject] IOrderDal dal)
 3. **Always use async/await** for database operations
 4. **Insert children after parent** so they have the parent ID
 5. **Use `FieldManager.UpdateChildrenAsync()`** to save child collections
-6. **Don't call `CheckRulesAsync()`** - validation already happened before save
+6. **Don't call `BusinessRules.CheckRulesAsync()`** - validation already happened before save

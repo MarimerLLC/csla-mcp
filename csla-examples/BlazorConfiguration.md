@@ -583,6 +583,57 @@ When `UseInMemoryApplicationContextManager = true`:
 - No state synchronization with WebAssembly clients
 - Simpler but only works for server-only scenarios
 
+### Custom Session Store (CSLA 10.1+)
+
+> **Applies to CSLA 10.1 and later.** In earlier versions the server-side `SessionManager` kept sessions in a hard-coded in-memory dictionary.
+
+When `UseInMemoryApplicationContextManager = false`, the server-side `SessionManager` (`Csla.Blazor.State.SessionManager` in `Csla.AspNetCore`) reads and writes sessions through an `ISessionStore` service. The default store is `InMemorySessionStore`, which keeps sessions in a `ConcurrentDictionary` in server memory. That keeps the old behavior, and it's fine for a single server. You don't need to change any configuration unless you want a different store.
+
+To share sessions across load-balanced servers, or to keep them through a restart, implement `Csla.State.ISessionStore` and register it with `SessionStoreType`:
+
+```csharp
+namespace Csla.State;
+
+public interface ISessionStore
+{
+    ValueTask<Session?> GetSessionAsync(string key);
+    ValueTask AddOrUpdateSessionAsync(string key, Session session);
+    ValueTask PurgeExpiredSessionsAsync(TimeSpan expiration);
+}
+```
+
+```csharp
+builder.Services.AddCsla(options => options
+    .AddAspNetCore()
+    .AddServerSideBlazor(blazor =>
+    {
+        blazor.UseInMemoryApplicationContextManager = false;
+        blazor.SessionStoreType = typeof(MyDistributedSessionStore);
+    })
+    .DataPortal(dp => dp
+        .AddServerSideDataPortal()));
+```
+
+`BlazorServerConfigurationOptions` has these session-related properties:
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `SessionStoreType` | `Csla.Blazor.State.InMemorySessionStore` | `ISessionStore` implementation (registered as a **singleton**) |
+| `SessionManagerType` | `Csla.Blazor.State.SessionManager` | `ISessionManager` implementation (singleton) |
+| `SessionIdManagerType` | `Csla.Blazor.State.SessionIdManager` | `ISessionIdManager` implementation (transient) |
+
+These types are registered only when `UseInMemoryApplicationContextManager = false`. When it's `true`, CSLA uses a no-op session manager and doesn't use `ISessionStore`.
+
+Implementation rules for a custom store:
+
+- `GetSessionAsync` returns `null` when there's no session for the key. `SessionManager` then creates a new, empty `Session` and stores it with `AddOrUpdateSessionAsync`.
+- `AddOrUpdateSessionAsync` inserts or replaces the session for the key.
+- `PurgeExpiredSessionsAsync(expiration)` removes sessions whose `Session.LastTouched` (Unix time in seconds, UTC) is older than `expiration`.
+- The store is a **singleton**, so it must be thread-safe, and it can depend only on singleton services. It can't take scoped services such as `ApplicationContext`.
+- `Session` is a `MobileDictionary<string, object?>`. It holds the user's principal and the `LocalContext`/`ClientContext` dictionaries. A distributed store has to serialize it, together with the principal and every value your app puts into those contexts.
+- `SessionManager` calls the store synchronously: if a `ValueTask` isn't already complete, it blocks on it. Keep store operations fast, and avoid code that needs a synchronization context.
+- The server-side context manager changes the `Session` instance that `GetSessionAsync` returned in place, for example when `LocalContext` or `ClientContext` is set. It doesn't call `AddOrUpdateSessionAsync` for those changes. `AddOrUpdateSessionAsync` runs when a session is first created and when a WebAssembly client sends its state back through `CslaStateController`. A store that returns a new copy on every read (such as one that deserializes from Redis each time) won't keep in-place changes unless it handles that itself, for example by keeping the live instances in a local cache and writing them through.
+
 ### Using StateManager in Blazor Pages
 
 In your Blazor pages (especially those that may run in WebAssembly), inject and use `StateManager`:

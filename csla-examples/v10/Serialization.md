@@ -119,7 +119,7 @@ For more control, implement `IMobileSerializer`:
 ```csharp
 public class CustomAddressSerializer : IMobileSerializer
 {
-    public bool CanSerialize(Type type) => type == typeof(AddressInfo);
+    public static bool CanSerialize(Type type) => type == typeof(AddressInfo);
     
     public void Serialize(object obj, SerializationInfo info)
     {
@@ -274,7 +274,7 @@ public sealed partial class Person : BusinessBase<Person>
 ```csharp
 var services = new ServiceCollection();
 services.AddCsla(options => options
-    .Serialization(so => so.SerializationFormatter(typeof(GeneratorFormatter))));
+    .Serialization(so => so.UseSerializationFormatter<GeneratorFormatter>()));
 services.AddCslaGeneratorSerialization();
 var provider = services.BuildServiceProvider();
 ```
@@ -341,8 +341,8 @@ CSLA uses the configured serializer automatically for all internal operations. Y
 ### Object Cloning
 
 ```csharp
-// Using ApplicationContext (injected)
-var cloner = applicationContext.GetRequiredService<ObjectCloner>();
+// Using ApplicationContext (injected); ObjectCloner is not registered in DI
+var cloner = ObjectCloner.GetInstance(applicationContext);
 var clone = cloner.Clone(originalObject);
 ```
 

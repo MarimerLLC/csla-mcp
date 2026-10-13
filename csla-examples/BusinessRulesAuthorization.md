@@ -525,11 +525,11 @@ Use attributes for type-level authorization that doesn't depend on object state:
 public static void AddObjectAuthorizationRules(IAddObjectAuthorizationRulesContext context)
 {
     // Only Admin users can create new Customer objects
-    context.Rules.AddRule(typeof(Customer),
+    Csla.Rules.BusinessRules.AddRule(typeof(Customer),
         new IsInRole(AuthorizationActions.CreateObject, "Admin"));
 
     // Only Admin and Manager users can delete Customer objects
-    context.Rules.AddRule(typeof(Customer),
+    Csla.Rules.BusinessRules.AddRule(typeof(Customer),
         new IsInRole(AuthorizationActions.DeleteObject, "Admin", "Manager"));
 
     // Anyone can fetch Customer objects
@@ -672,11 +672,22 @@ public void Approve()
 ### Check Object Authorization
 
 ```csharp
-public static bool CanUserCreateOrder(IDataPortal<Order> portal)
+public static bool CanUserCreateOrder(ApplicationContext applicationContext)
 {
     return Csla.Rules.BusinessRules.HasPermission(
+        applicationContext,
         AuthorizationActions.CreateObject,
         typeof(Order));
+}
+
+// Use the async form when the per-type rule may be an async rule
+public static Task<bool> CanUserCreateOrderAsync(ApplicationContext applicationContext)
+{
+    return Csla.Rules.BusinessRules.HasPermissionAsync(
+        applicationContext,
+        AuthorizationActions.CreateObject,
+        typeof(Order),
+        CancellationToken.None);
 }
 ```
 
@@ -749,7 +760,7 @@ public class CanEditDocument : AuthorizationRuleAsync
         CacheResult = false; // Re-check each time
     }
 
-    protected override async Task ExecuteAsync(IAuthorizationContext context)
+    protected override async Task ExecuteAsync(IAuthorizationContext context, CancellationToken ct)
     {
         if (context.Target is Document doc)
         {
@@ -774,6 +785,33 @@ protected override void AddBusinessRules()
     BusinessRules.AddRule(
         new CanEditDocument(AuthorizationActions.WriteProperty, ContentProperty));
 }
+```
+
+**Evaluating async authorization rules:** The synchronous checks (`CanReadProperty`, `CanWriteProperty`, `CanExecuteMethod`, and `BusinessRules.HasPermission`) never wait for an async rule. Use `BusinessRules.HasPermissionAsync(...)` to evaluate async rules.
+
+- **CSLA 10 and earlier:** a synchronous check that finds an `IAuthorizationRuleAsync` throws `ArgumentOutOfRangeException`, including the per-type check made by `IsSavable`.
+- **CSLA 11:** a synchronous check runs an async rule if its task completes synchronously. If the rule is still running, it throws an `InvalidOperationException` that tells you to use `HasPermissionAsync`. The XAML `ViewModelBase` / `ObjectStatus` and the Blazor `ViewModel<T>` evaluate per-type rules with `HasPermissionAsync`, so their `CanCreateObject`, `CanEditObject`, etc. properties update (raising `PropertyChanged` in XAML) when an async rule completes. In Blazor, `RefreshAsync` awaits these permission checks.
+
+### Async Object Authorization and IsSavable (CSLA 11)
+
+In CSLA 11, `IsSavable` supports truly async per-type authorization rules. `IsSavable` checks the `CreateObject` (new object), `EditObject` (existing object), or `DeleteObject` (deleted object) rule on `BusinessBase`, and the `EditObject` rule on `BusinessListBase` and `BusinessBindingListBase`:
+
+- A rule that completes synchronously (a sync rule, or an async rule that doesn't actually await) is evaluated on every read of `IsSavable` and is not cached, as before.
+- If the async rule is still running, the object is marked busy (`IsBusy` is `true`, `BusyChanged` is raised) and `IsSavable` returns `false`.
+- When the rule completes, its result is cached for that action and user, the object becomes idle, and change notification is raised for `IsSavable` (`PropertyChanged` on `BusinessBase` and `BusinessListBase`; `BusyChanged` on the list types). The cached result is re-evaluated when the action (new / existing / deleted) or the user changes, but not when other properties change.
+- If the rule throws, `IsSavable` is `false` and the exception is raised through the object's unhandled async exception handling (`UnhandledAsyncException`).
+- Calling `Save`/`SaveAsync` while the check is running throws `InvalidOperationException` ("Objects that are marked busy may not be saved"), the same as with running async business rules.
+
+Because this reuses the busy state, code that already waits for busy objects works without changes: the Blazor `ViewModel<T>.SaveAsync` waits while the model is busy, XAML view models track busy state, and you can call `await obj.WaitForIdle()` before reading `IsSavable` in server-side code:
+
+```csharp
+var order = await orderPortal.FetchAsync(id);
+order.Status = "Approved";
+
+_ = order.IsSavable;        // may start an async EditObject rule (object becomes busy)
+await order.WaitForIdle();  // wait for the rule to complete
+if (order.IsSavable)
+    order = await order.SaveAsync();
 ```
 
 ## Common Patterns

@@ -12,7 +12,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
 {
     var customerData = await customerDal.Get(id);
     Csla.Data.DataMapper.Map(customerData, this);
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -36,7 +36,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal, [Inject(Allo
     logger?.LogInformation($"Fetching customer {id}");
 
     Csla.Data.DataMapper.Map(customerData, this);
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -51,7 +51,7 @@ private async Task Fetch(int id, [Inject(AllowNull = false)] ICustomerDal custom
     // customerDal is guaranteed to be non-null
     var customerData = await customerDal.Get(id);
     Csla.Data.DataMapper.Map(customerData, this);
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -81,7 +81,7 @@ private async Task Fetch(
         Csla.Data.DataMapper.Map(customerData, this);
     }
 
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -128,9 +128,70 @@ private async Task Fetch(
     // Send welcome email if this is a new fetch
     await emailService.SendWelcomeEmail(customerData.Email);
 
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
+
+## Keyed Services (CSLA 10.1+)
+
+> **Applies to CSLA 10.1 and later.** The `Key` property on `[Inject]` doesn't exist in CSLA 10.0 or earlier.
+
+`Microsoft.Extensions.DependencyInjection` 8.0 and later supports *keyed services*: several implementations of the same service type, registered under different keys with `AddKeyedSingleton`, `AddKeyedScoped`, or `AddKeyedTransient`. Use the `Key` property of `[Inject]` to pick one by key in a data portal operation method:
+
+```csharp
+// Registration
+services.AddKeyedTransient<IEmailService, SendGridEmailService>("sendgrid");
+services.AddKeyedTransient<IEmailService, SmtpEmailService>("smtp");
+```
+
+```csharp
+[Create]
+private async Task Create([Inject(Key = "sendgrid")] IEmailService emailService)
+{
+    // emailService is the SendGridEmailService registration
+    await BusinessRules.CheckRulesAsync();
+}
+
+[Fetch]
+private async Task Fetch(int id, [Inject] ICustomerDal dal, [Inject(Key = "smtp")] IEmailService emailService)
+{
+    // criteria (id), an unkeyed service, and a keyed service can be mixed
+    var data = await dal.Get(id);
+    Csla.Data.DataMapper.Map(data, this);
+    await BusinessRules.CheckRulesAsync();
+}
+```
+
+How keyed injection resolves services:
+
+| Declaration | Resolution | If no service is registered for the key |
+| --- | --- | --- |
+| `[Inject(Key = "k")] IService service` | `GetRequiredKeyedService(typeof(IService), "k")` | Throws |
+| `[Inject(Key = "k", AllowNull = true)] IService service` | `IKeyedServiceProvider.GetKeyedService(typeof(IService), "k")` | `null` |
+| `[Inject(Key = "k")] IService? service` (nullable reference types enabled) | Same as `AllowNull = true` | `null` |
+
+Notes:
+
+- `Key` is typed `object?`, so any key type that works with `AddKeyed*` works, such as strings, enums, or constants.
+- Use constants or enums for keys so the registration and the `[Inject]` attribute can't drift apart:
+
+  ```csharp
+  public static class EmailProviders
+  {
+      public const string SendGrid = "sendgrid";
+      public const string Smtp = "smtp";
+  }
+
+  [Create]
+  private async Task Create([Inject(Key = EmailProviders.SendGrid)] IEmailService emailService)
+  {
+      await BusinessRules.CheckRulesAsync();
+  }
+  ```
+
+- An optional keyed service (`AllowNull = true` or a nullable parameter) needs a service provider that implements `IKeyedServiceProvider`. The default Microsoft DI container does. Otherwise CSLA throws `InvalidOperationException`.
+- `[Inject]` without `Key` works as before. A keyed registration isn't resolved by an unkeyed `[Inject]`.
+- Keyed injection works in every place `[Inject]` is supported, including child operations (`[FetchChild]`, `[InsertChild]`, and so on), command `[Execute]` methods, and (CSLA 10.2+) ObjectFactory factory methods.
 
 ## Common Scenarios
 
@@ -142,7 +203,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal dal)
 {
     var data = await dal.Get(id);
     Csla.Data.DataMapper.Map(data, this);
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -180,7 +241,7 @@ private async Task Fetch(
         if (data != null)
         {
             Csla.Data.DataMapper.Map(data, this);
-            await CheckRulesAsync();
+            await BusinessRules.CheckRulesAsync();
             return;
         }
     }
@@ -192,7 +253,7 @@ private async Task Fetch(
     // Store in cache for next time
     cache?.Set($"customer_{id}", data, TimeSpan.FromMinutes(5));
 
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
@@ -215,7 +276,7 @@ private async Task Create(
     LoadProperty(CreatedDateProperty, defaultData.CreatedDate);
     LoadProperty(IsActiveProperty, defaultData.IsActive);
 
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
