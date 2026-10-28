@@ -13,6 +13,7 @@ This document applies to CSLA 11. It is a practical checklist for upgrading code
 7. Review code that reads `TransactionalAttribute` values, constructs `TransactionalDataPortal`, or changes `DataOptions` transaction defaults. [Details](#transaction-changes)
 8. If you use async per-type authorization rules, review `IsSavable` and save logic. [Details](#issavable-and-async-authorization-rules)
 9. Optional: adopt strongly typed data portal calls with `[DataPortalExtensions]`. [Details](#optional-strongly-typed-data-portal-calls)
+10. Only if the app is trimmed or compiled with NativeAOT: follow the trimming and NativeAOT guide. [Details](#only-if-you-use-trimming-or-nativeaot)
 
 ## Target frameworks
 
@@ -431,6 +432,12 @@ var person = await portal.PortalFetchAsync(42);
 ```
 
 Once enabled, analyzer CSLA0025 (warning) flags untyped calls that a generated method can replace, with a code fix. See [DataPortalExtensions.md](DataPortalExtensions.md). If you used Stefan Ossendorf's `Csla.DataPortalExtensions` package, switch to the built-in generator.
+
+## Only if you use trimming or NativeAOT
+
+CSLA 11 supports trimmed and NativeAOT apps. This section only applies if your app is published with `PublishTrimmed` or `PublishAot`, which includes Blazor WebAssembly (always trimmed) and .NET MAUI on iOS and Android (trimmed by default). Apps that aren't trimmed need no changes.
+
+CSLA 11 marks APIs that can't work safely after trimming with `[RequiresUnreferencedCode]` or `[RequiresDynamicCode]`, so a trimmed app can show new `IL2026` or `IL3050` warnings where it calls them. To build a trimmed or NativeAOT app correctly, follow [TrimmingAndNativeAot.md](TrimmingAndNativeAot.md). It covers the business class requirements, which list types and APIs to avoid, serialization, generic data portal code, data portal servers, Blazor and MAUI.
 
 ## Analyzer changes
 
