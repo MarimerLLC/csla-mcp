@@ -19,6 +19,7 @@ This example demonstrates a customer editable root object with properties, busin
 
 ```csharp
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Csla;
@@ -49,18 +50,18 @@ namespace MyApp.Business
             BusinessRules.AddRule(new EmailUniqueRule(EmailProperty));
 
             // Dependency: when Name changes, recheck Email rules
-            BusinessRules.AddRule(new Rules.CommonRules.Dependency(NameProperty, EmailProperty));
+            BusinessRules.AddRule(new Csla.Rules.CommonRules.Dependency(NameProperty, EmailProperty));
         }
 
         [ObjectAuthorizationRules]
         public static void AddObjectAuthorizationRules()
         {
             BusinessRules.AddRule(typeof(CustomerEdit), 
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.CreateObject, "Admin", "Manager"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.CreateObject, "Admin", "Manager"));
             BusinessRules.AddRule(typeof(CustomerEdit), 
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
             BusinessRules.AddRule(typeof(CustomerEdit), 
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.DeleteObject, "Admin"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.DeleteObject, "Admin"));
         }
 
         [Create]
@@ -81,7 +82,7 @@ namespace MyApp.Business
             var data = await dal.GetAsync(id);
             
             if (data == null)
-                throw new DataNotFoundException($"Customer {id} not found");
+                throw new KeyNotFoundException($"Customer {id} not found");
             
             LoadProperty(IdProperty, data.Id);
             LoadProperty(NameProperty, data.Name);
@@ -138,15 +139,15 @@ namespace MyApp.Business
         }
 
         // Custom business rule example
-        private class EmailUniqueRule : Rules.BusinessRule
+        private class EmailUniqueRule : Csla.Rules.BusinessRule
         {
-            public EmailUniqueRule(Core.IPropertyInfo primaryProperty)
+            public EmailUniqueRule(Csla.Core.IPropertyInfo primaryProperty)
                 : base(primaryProperty)
             {
-                InputProperties = new List<Core.IPropertyInfo> { primaryProperty };
+                InputProperties.Add(primaryProperty);
             }
 
-            protected override void Execute(Rules.IRuleContext context)
+            protected override void Execute(Csla.Rules.IRuleContext context)
             {
                 var email = (string)context.InputPropertyValues[PrimaryProperty];
 
@@ -220,7 +221,7 @@ CSLA automatically converts data annotations into business rules. Use them for c
 
 ### Custom Business Rules
 
-For validation that can't be expressed with data annotations, create custom rules by deriving from `Rules.BusinessRule`. See the `EmailUniqueRule` example above.
+For validation that can't be expressed with data annotations, create custom rules by deriving from `Csla.Rules.BusinessRule`. See the `EmailUniqueRule` example above.
 
 ### Authorization Rules
 

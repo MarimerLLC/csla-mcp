@@ -50,18 +50,18 @@ namespace MyApp.Business
         {
             base.AddBusinessRules();
 
-            BusinessRules.AddRule(new Rules.CommonRules.Dependency(InvoiceDateProperty, InvoiceNumberProperty));
+            BusinessRules.AddRule(new Csla.Rules.CommonRules.Dependency(InvoiceDateProperty, InvoiceNumberProperty));
         }
 
         [ObjectAuthorizationRules]
         public static void AddObjectAuthorizationRules()
         {
             BusinessRules.AddRule(typeof(InvoiceEdit),
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.CreateObject, "Admin", "Billing"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.CreateObject, "Admin", "Billing"));
             BusinessRules.AddRule(typeof(InvoiceEdit),
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.EditObject, "Admin", "Billing"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.EditObject, "Admin", "Billing"));
             BusinessRules.AddRule(typeof(InvoiceEdit),
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.DeleteObject, "Admin"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.DeleteObject, "Admin"));
         }
 
         [Create]
@@ -185,8 +185,8 @@ namespace MyApp.Business
             base.AddBusinessRules();
 
             // Recalculate LineTotal when Quantity or Price changes
-            BusinessRules.AddRule(new Rules.CommonRules.Dependency(QuantityProperty, LineTotalProperty));
-            BusinessRules.AddRule(new Rules.CommonRules.Dependency(PriceProperty, LineTotalProperty));
+            BusinessRules.AddRule(new Csla.Rules.CommonRules.Dependency(QuantityProperty, LineTotalProperty));
+            BusinessRules.AddRule(new Csla.Rules.CommonRules.Dependency(PriceProperty, LineTotalProperty));
             BusinessRules.AddRule(new CalcLineTotalRule(LineTotalProperty, QuantityProperty, PriceProperty));
         }
 
@@ -248,21 +248,22 @@ namespace MyApp.Business
             await dal.DeleteAsync(ReadProperty(IdProperty));
         }
 
-        private class CalcLineTotalRule : Rules.BusinessRule
+        private class CalcLineTotalRule : Csla.Rules.BusinessRule
         {
-            private Core.IPropertyInfo _quantityProperty;
-            private Core.IPropertyInfo _priceProperty;
+            private Csla.Core.IPropertyInfo _quantityProperty;
+            private Csla.Core.IPropertyInfo _priceProperty;
 
-            public CalcLineTotalRule(Core.IPropertyInfo primaryProperty,
-                Core.IPropertyInfo quantityProperty, Core.IPropertyInfo priceProperty)
+            public CalcLineTotalRule(Csla.Core.IPropertyInfo primaryProperty,
+                Csla.Core.IPropertyInfo quantityProperty, Csla.Core.IPropertyInfo priceProperty)
                 : base(primaryProperty)
             {
                 _quantityProperty = quantityProperty;
                 _priceProperty = priceProperty;
-                InputProperties = new List<Core.IPropertyInfo> { quantityProperty, priceProperty };
+                InputProperties.Add(quantityProperty);
+                InputProperties.Add(priceProperty);
             }
 
-            protected override void Execute(Rules.IRuleContext context)
+            protected override void Execute(Csla.Rules.IRuleContext context)
             {
                 var quantity = (int)context.InputPropertyValues[_quantityProperty];
                 var price = (decimal)context.InputPropertyValues[_priceProperty];

@@ -328,5 +328,5 @@ public class ComprehensiveAsyncRuleExceptionHandler : IUnhandledAsyncRuleExcepti
 - By default, CSLA 10 does **not** handle exceptions in asynchronous rules - they remain unhandled
 - Implementing a handler doesn't mean all exceptions are automatically handled - `CanHandle` must return `true`
 - The handler runs in the same execution context as the rule
-- Multiple handlers can be registered, and they will be called in the order they were registered
+- Only one handler is used. CSLA resolves a single `IUnhandledAsyncRuleExceptionHandler` from DI, so if you register more than one, the last registration wins. To combine behaviors, write one handler that delegates to others
 - The handler is registered as scoped, so it can have scoped dependencies like `DbContext` or user context

@@ -1,4 +1,3 @@
-````markdown
 # MAUI Configuration
 
 CSLA supports .NET MAUI applications for building cross-platform mobile and desktop apps. This guide covers how to configure CSLA in a MAUI application for both local data portal scenarios and n-tier configurations with a remote server.
@@ -20,6 +19,8 @@ Add the following NuGet package to your MAUI project:
 ```
 
 The `Csla.Maui` package includes the core CSLA library and adds XAML-specific support for MAUI applications.
+
+> **CSLA 11:** Use version 11 of `Csla.Maui`, which targets `net10.0-*` and `net11.0-*` (`android`, `ios`, `maccatalyst`, `windows`); .NET 8 and .NET 9 are no longer supported. On .NET 11, Android apps require API level 24 or later (the `net10.0-android` target still supports API level 21).
 
 ## Basic Configuration (Local Data Portal)
 
@@ -643,4 +644,3 @@ For platform-specific problems:
 - Business objects and data access can be shared between MAUI and server projects
 - CSLA 9+ includes fixes for binary data transfer issues on Android
 
-````

@@ -2,9 +2,11 @@
 
 CSLA provides two delete operations: `[Delete]` and `[DeleteSelf]`. Both remove business objects from the data source, but they're used in different scenarios.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Delete]` or `[DeleteSelf]`. Methods named `DataPortal_Delete` or `DataPortal_DeleteSelf` without the attribute are never called. Declare the business class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## Delete vs DeleteSelf
 
-- **`[Delete]`**: Static method that deletes by ID without loading the object first
+- **`[Delete]`**: Instance method (invoked on a new, empty instance) that deletes by criteria without loading the object first; called by `IDataPortal<T>.DeleteAsync(criteria)`
 - **`[DeleteSelf]`**: Instance method that deletes the current object (called during `SaveAsync()`)
 
 ## Delete Operation
@@ -34,14 +36,14 @@ namespace MyApp.Business
 }
 
 // Client usage
-await customerPortal.DeleteAsync(customerId: 123);
+await customerPortal.DeleteAsync(123);
 ```
 
 ### Delete with Authorization Check
 
 ```csharp
 [Delete]
-private async Task Delete(int id, [Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task Delete(int id, [Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     // Verify user has permission
     if (!appContext.User.IsInRole("Manager"))
@@ -62,7 +64,7 @@ private async Task Delete(int customerId, string tenantId, [Inject] ICustomerDal
 }
 
 // Client usage
-await customerPortal.DeleteAsync(customerId: 123, tenantId: "ACME");
+await customerPortal.DeleteAsync(123, "ACME");  // criteria are positional (params object[])
 ```
 
 ### Delete with Criteria Object
@@ -202,7 +204,7 @@ Mark as deleted instead of physically removing:
 
 ```csharp
 [DeleteSelf]
-private async Task DeleteSelf([Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task DeleteSelf([Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     // Soft delete - just mark as inactive
     var data = new CustomerData
@@ -227,7 +229,7 @@ private async Task DeleteSelf([Inject] ICustomerDal dal, [Inject] IApplicationCo
 
 ```csharp
 [Delete]
-private async Task Delete(int id, [Inject] ICustomerDal dal, [Inject] IAuditDal auditDal, [Inject] IApplicationContext appContext)
+private async Task Delete(int id, [Inject] ICustomerDal dal, [Inject] IAuditDal auditDal, [Inject] ApplicationContext appContext)
 {
     // Log deletion before deleting
     await auditDal.LogDeletionAsync(

@@ -1,4 +1,3 @@
-````markdown
 # Business Rules: Accessing Parent Objects
 
 Sometimes a business rule needs to access properties from objects higher in the object graph. CSLA provides the `IParent` interface and `context.Target` to navigate up through the hierarchy. This pattern is useful when child object calculations depend on parent-level values.
@@ -103,7 +102,7 @@ namespace MyApp.Business
             // Recalculate order total when line items change
             if (e.ChildObject is LineItemEdit || e.ListChangedArgs != null)
             {
-                await CheckRulesAsync(LineItemsProperty);
+                await BusinessRules.CheckRulesAsync(LineItemsProperty);
             }
         }
 
@@ -459,12 +458,16 @@ private async Task RecalculateLineItemTotals()
     foreach (var item in items)
     {
         // Trigger rules on each line item's total property
-        await item.CheckRulesAsync(LineItemEdit.LineItemTotalProperty);
+        // (BusinessRules is protected, so the child exposes a helper method)
+        await item.RecalculateTotalAsync();
     }
 
     // Also recalculate order total
-    await CheckRulesAsync(LineItemsProperty);
+    await BusinessRules.CheckRulesAsync(LineItemsProperty);
 }
+
+// In LineItemEdit
+internal Task RecalculateTotalAsync() => BusinessRules.CheckRulesAsync(LineItemTotalProperty);
 ```
 
 ## Alternative: Pass Values Down
@@ -492,8 +495,8 @@ private decimal _parentDiscount;
 internal void SetParentDiscount(decimal discount)
 {
     _parentDiscount = discount;
-    // Trigger recalculation
-    CheckRulesAsync(LineItemTotalProperty);
+    // Trigger recalculation (async rules for the property run in the background)
+    BusinessRules.CheckRules(LineItemTotalProperty);
 }
 ```
 
@@ -567,4 +570,3 @@ Accessing parent objects from child rules via `context.Target` and `IParent`:
 - [BusinessRules.md](BusinessRules.md) - Overview of the business rules system
 - [BusinessRulesContext.md](BusinessRulesContext.md) - Rule context and execution flags
 
-````

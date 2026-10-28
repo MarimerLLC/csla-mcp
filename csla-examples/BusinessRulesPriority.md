@@ -102,7 +102,7 @@ protected override void AddBusinessRules()
     BusinessRules.AddRule(new Required(EmailProperty) { Priority = -10 });
 
     // Priority -5: Check format if value exists
-    BusinessRules.AddRule(new Email(EmailProperty) { Priority = -5 });
+    BusinessRules.AddRule(new RegExMatch(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$") { Priority = -5 });
 
     // Priority 0: Check uniqueness if format is valid (async)
     BusinessRules.AddRule(new UniqueEmailAsync(EmailProperty));
