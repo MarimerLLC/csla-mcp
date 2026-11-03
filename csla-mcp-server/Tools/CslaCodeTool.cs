@@ -67,7 +67,7 @@ namespace CslaMcpServer.Tools
     [McpServerTool, Description(mcpServerDescription)]
     public async Task<string> Search(
       [Description(searchDescription)]string message,
-      [Description("Optional CSLA version number (e.g., 9 or 10). If not provided, defaults to the highest version available.")]int? version = null)
+      [Description("Optional CSLA version number (e.g., 9, 10, or 11). If not provided, defaults to the highest version available.")]int? version = null)
     {
       logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
       
@@ -457,7 +457,7 @@ namespace CslaMcpServer.Tools
     }
 
     [McpServerTool, Description(fetchDescription)]
-    public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v10/Command.md' if multiple versions exist.")]string fileName)
+    public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v11/Command.md' if multiple versions exist.")]string fileName)
     {
       logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
       

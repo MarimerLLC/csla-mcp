@@ -296,7 +296,7 @@ Description: Extracts significant words from the provided input text and searche
 Parameters:
 
 - `message` (string, required): Natural language text or keywords to search for. Words of length 4 or less are ignored by the tool. The tool also searches for 2-word combinations from adjacent words to find phrase matches (e.g., "create operation" and "operation method" from "create operation method").
-- `version` (integer, optional): CSLA version number to filter results (e.g., `9` or `10`). If not provided, defaults to the highest version available by scanning version subdirectories in the examples folder (e.g., `v9/`, `v10/`). Files in the root directory (common to all versions) are included regardless of the specified version.
+- `version` (integer, optional): CSLA version number to filter results (e.g., `9`, `10`, or `11`). If not provided, defaults to the highest version available by scanning version subdirectories in the examples folder (e.g., `v9/`, `v10/`, `v11/`). Files in the root directory (common to all versions) are included regardless of the specified version.
 
 Output: JSON array of objects with the shape:
 
@@ -342,7 +342,7 @@ Notes and behavior:
 - Matching is case-insensitive and counts multiple occurrences in a file.
 - Results combine both semantic search (when Azure OpenAI is configured) and keyword search for more accurate results.
 - Results are ordered by `Score` descending, then by filename.
-- Version filtering: Files in version subdirectories (e.g., `v9/`, `v10/`) are filtered by the specified version. Files in the root directory are considered common to all versions and are always included.
+- Version filtering: Files in version subdirectories (e.g., `v9/`, `v10/`, `v11/`) are filtered by the specified version. Files in the root directory are considered common to all versions and are always included.
 
 ### Tool: fetch
 

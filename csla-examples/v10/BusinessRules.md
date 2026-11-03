@@ -30,7 +30,7 @@ public partial class Customer : BusinessBase<Customer>
         BusinessRules.AddRule(new Required(NameProperty));
         BusinessRules.AddRule(new MaxLength(NameProperty, 100));
         BusinessRules.AddRule(new Required(EmailProperty));
-        BusinessRules.AddRule(new Email(EmailProperty));
+        BusinessRules.AddRule(new RegExMatch(EmailProperty, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"));
         BusinessRules.AddRule(new MinValue<int>(AgeProperty, 18));
         BusinessRules.AddRule(new MaxValue<int>(AgeProperty, 120));
     }
@@ -46,12 +46,13 @@ using Csla.Rules.CommonRules;
 BusinessRules.AddRule(new Required(PropertyInfo));
 BusinessRules.AddRule(new MaxLength(PropertyInfo, 100));
 BusinessRules.AddRule(new MinLength(PropertyInfo, 2));
-BusinessRules.AddRule(new RegEx(PropertyInfo, @"pattern"));
+BusinessRules.AddRule(new RegExMatch(PropertyInfo, @"pattern"));
 
 // Numeric validation
 BusinessRules.AddRule(new MinValue<int>(PropertyInfo, 0));
 BusinessRules.AddRule(new MaxValue<int>(PropertyInfo, 100));
-BusinessRules.AddRule(new Range<decimal>(PropertyInfo, 0.01m, 999.99m));
+BusinessRules.AddRule(new MinValue<decimal>(PropertyInfo, 0.01m));
+BusinessRules.AddRule(new MaxValue<decimal>(PropertyInfo, 999.99m));
 
 // Rule relationships
 BusinessRules.AddRule(new Dependency(PropertyInfo, DependentProperty));
@@ -71,7 +72,7 @@ public class ValidZipCode : BusinessRule
     public ValidZipCode(IPropertyInfo primaryProperty)
         : base(primaryProperty)
     {
-        InputProperties = new List<IPropertyInfo> { primaryProperty };
+        InputProperties.Add(primaryProperty);
     }
     
     protected override void Execute(IRuleContext context)
@@ -119,7 +120,8 @@ public class EndDateAfterStartDate : BusinessRule
         _startDateProperty = startDateProperty;
         _endDateProperty = endDateProperty;
         
-        InputProperties = new List<IPropertyInfo> { startDateProperty, endDateProperty };
+        InputProperties.Add(startDateProperty);
+        InputProperties.Add(endDateProperty);
         
         // Re-run this rule when either property changes
         AffectedProperties.Add(endDateProperty);
@@ -170,11 +172,9 @@ public class CalculateTotal : BusinessRule
         _priceProperty = priceProperty;
         _totalProperty = totalProperty;
         
-        InputProperties = new List<IPropertyInfo> { quantityProperty, priceProperty };
+        InputProperties.Add(quantityProperty);
+        InputProperties.Add(priceProperty);
         AffectedProperties.Add(totalProperty);
-        
-        // Don't run on server-side during data portal operations
-        IsAsync = false;
     }
     
     protected override void Execute(IRuleContext context)
@@ -216,8 +216,7 @@ public class CheckEmailUnique : BusinessRuleAsync
     public CheckEmailUnique(IPropertyInfo primaryProperty)
         : base(primaryProperty)
     {
-        InputProperties = new List<IPropertyInfo> { primaryProperty };
-        IsAsync = true;
+        InputProperties.Add(primaryProperty);
     }
     
     protected override async Task ExecuteAsync(IRuleContext context)
@@ -228,7 +227,7 @@ public class CheckEmailUnique : BusinessRuleAsync
             return;
 
         // Execute a command object to check if email exists
-        var portal = ApplicationContext.GetRequiredService<IDataPortal<EmailExistsCommand>>();
+        var portal = context.ApplicationContext.GetRequiredService<IDataPortal<EmailExistsCommand>>();
         var command = await portal.ExecuteAsync(email);
 
         if (command.Exists)
@@ -285,11 +284,9 @@ public class HasClaim : AuthorizationRule
     
     protected override void Execute(IAuthorizationContext context)
     {
-        var principal = ApplicationContext.Principal as ClaimsPrincipal;
-        if (principal == null || !principal.HasClaim(_claimType, _claimValue))
-        {
-            context.HasPermission = false;
-        }
+        // HasPermission starts out false, so the rule must set it explicitly
+        var principal = context.ApplicationContext.Principal;
+        context.HasPermission = principal.HasClaim(_claimType, _claimValue);
     }
 }
 
@@ -297,14 +294,13 @@ public class HasClaim : AuthorizationRule
 [CslaImplementProperties]
 public partial class SensitiveData : BusinessBase<SensitiveData>
 {
-    protected override void AddBusinessRules()
+    [ObjectAuthorizationRules]
+    public static void AddObjectAuthorizationRules()
     {
-        base.AddBusinessRules();
-        
-        // Object-level authorization
-        BusinessRules.AddRule(new HasClaim(AuthorizationActions.ReadProperty, "Department", "Management"));
-        BusinessRules.AddRule(new HasClaim(AuthorizationActions.WriteProperty, ClaimTypes.Role, "Administrator"));
-        BusinessRules.AddRule(new HasClaim(AuthorizationActions.DeleteObject, ClaimTypes.Role, "Administrator"));
+        // Object-level (per-type) rules: at most one rule per action
+        BusinessRules.AddRule(typeof(SensitiveData), new HasClaim(AuthorizationActions.GetObject, "Department", "Management"));
+        BusinessRules.AddRule(typeof(SensitiveData), new HasClaim(AuthorizationActions.EditObject, ClaimTypes.Role, "Administrator"));
+        BusinessRules.AddRule(typeof(SensitiveData), new HasClaim(AuthorizationActions.DeleteObject, ClaimTypes.Role, "Administrator"));
     }
 }
 
@@ -544,12 +540,13 @@ public class StopIfNotCanWrite : BusinessRule
     public StopIfNotCanWrite(IPropertyInfo primaryProperty)
         : base(primaryProperty)
     {
-        InputProperties = new List<IPropertyInfo> { primaryProperty };
+        InputProperties.Add(primaryProperty);
     }
     
     protected override void Execute(IRuleContext context)
     {
-        var canWrite = CanWriteProperty(PrimaryProperty);
+        var target = (BusinessBase)context.Target;
+        var canWrite = target.CanWriteProperty(PrimaryProperty);
         if (!canWrite)
         {
             context.AddSuccessResult(true); // Stop processing subsequent rules
@@ -590,24 +587,17 @@ protected override void AddBusinessRules()
 
 ### Per-Type Rules
 
-Define rules once for all instances of a type:
+`AddBusinessRules` is called once per business object type, not once per instance. The rules it adds are stored in a per-type cache and shared by every instance of the type. There is no per-instance rule registration; if a rule must behave differently for specific instances, put that logic in the rule itself (for example by inspecting `context.Target`).
 
 ```csharp
 [CslaImplementProperties]
 public partial class Customer : BusinessBase<Customer>
 {
-    // Called once when type is first used
-    protected override void AddBusinessRulesExtend()
-    {
-        base.AddBusinessRulesExtend();
-        // Rules added here apply to all instances
-    }
-    
-    // Called for each instance
+    // Called once per type; the rules are shared by all instances
     protected override void AddBusinessRules()
     {
         base.AddBusinessRules();
-        // Rules added here are per-instance
+        // Rules added here apply to all instances of Customer
     }
 }
 ```
@@ -626,7 +616,7 @@ public class RequiredIfNew : BusinessRule
     public RequiredIfNew(IPropertyInfo primaryProperty)
         : base(primaryProperty)
     {
-        InputProperties = new List<IPropertyInfo> { primaryProperty };
+        InputProperties.Add(primaryProperty);
     }
     
     protected override void Execute(IRuleContext context)
@@ -666,8 +656,11 @@ public class ConditionalRule : BusinessRule
     {
         _innerRule = innerRule;
         _condition = condition;
-        InputProperties = innerRule.InputProperties;
-        AffectedProperties = innerRule.AffectedProperties;
+        // InputProperties and AffectedProperties are get-only lists, so copy the items
+        InputProperties.AddRange(innerRule.InputProperties);
+        foreach (var property in innerRule.AffectedProperties)
+            if (!AffectedProperties.Contains(property))
+                AffectedProperties.Add(property);
     }
     
     protected override void Execute(IRuleContext context)
@@ -705,17 +698,13 @@ public class AdminOnlyForSensitiveData : AuthorizationRule
     
     protected override void Execute(IAuthorizationContext context)
     {
-        var target = (BusinessBase)context.Target;
+        // Assuming IsSensitive is a property on your business class
+        var target = (Employee)context.Target;
         
-        // Only enforce this authorization rule for sensitive data
-        if (target.IsSensitive) // Assuming IsSensitive is a property on the business object
-        {
-            if (!ApplicationContext.User.IsInRole("Administrator"))
-            {
-                context.HasPermission = false;
-            }
-        }
-        // If not sensitive, permission is granted by default
+        // HasPermission starts out false, so always set it.
+        // Only Administrators may access sensitive data; anyone may access other data.
+        context.HasPermission = !target.IsSensitive
+            || context.ApplicationContext.User.IsInRole("Administrator");
     }
 }
 ```
@@ -738,7 +727,8 @@ public class UpdateFullName : BusinessRule
         _lastNameProperty = lastNameProperty;
         _fullNameProperty = fullNameProperty;
         
-        InputProperties = new List<IPropertyInfo> { firstNameProperty, lastNameProperty };
+        InputProperties.Add(firstNameProperty);
+        InputProperties.Add(lastNameProperty);
         AffectedProperties.Add(fullNameProperty);
     }
     

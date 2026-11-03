@@ -405,7 +405,7 @@ Both frameworks use the same CSLA configuration. The only differences are in how
 2. **Register the model binder** - The CSLA model binder is essential for proper object binding
 3. **Add HttpContextAccessor** - Required for CSLA's context management
 4. **Use async methods** - Prefer `FetchAsync`, `SaveAsync`, etc. for better scalability
-5. **Handle validation** - Check `IsSavable` before calling `SaveAsync()`
+5. **Handle validation** - Check `IsSavable` before calling `SaveAsync()`. In CSLA 11, if the `CreateObject`/`EditObject`/`DeleteObject` authorization rule is async, the first read of `IsSavable` returns `false` and marks the object busy until the rule completes; call `await obj.WaitForIdle()` and then read `IsSavable` again
 6. **Register DAL services** - Use dependency injection for data access layer components
 
 ## Troubleshooting

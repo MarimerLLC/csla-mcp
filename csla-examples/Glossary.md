@@ -2,7 +2,7 @@
 
 This glossary defines terms and concepts commonly used in CSLA .NET development. It is optimized for AI assistants helping developers write CSLA code.
 
-**Version Focus**: This document primarily covers CSLA .NET version 10, which uses code generation via `[CslaImplementProperties]`. Version 9 examples exist in `v9/` subdirectory for reference.
+**Version Focus**: This document primarily covers CSLA .NET versions 10 and 11, which use code generation via `[CslaImplementProperties]`. Version-specific examples exist in the `v9/`, `v10/`, and `v11/` subdirectories. CSLA 11 differences are called out with **CSLA 11** notes; see `v11/UpgradingToCsla11.md` for the full list of breaking changes.
 
 **Related Documents**:
 - `ObjectStereotypes.md` - Overview of all stereotypes and when to use each base class
@@ -11,6 +11,7 @@ This glossary defines terms and concepts commonly used in CSLA .NET development.
 - `v10/Properties.md` - Property declaration patterns for CSLA 10
 - `DataPortalOperation*.md` - Detailed examples for each data portal operation (Create, Fetch, Insert, Update, Delete, Execute)
 - `v10/EditableRoot.md`, `v10/EditableChild.md`, etc. - Complete stereotype implementations with full code
+- `v11/DataPortalOperationDispatch.md`, `v11/DataPortalExtensions.md`, `v11/TransactionScopeFactory.md` - CSLA 11 data portal features
 
 ## Architecture
 
@@ -51,7 +52,9 @@ CSLA uses attributes to mark classes, methods, and properties for specific behav
 
 | Attribute | Purpose | Usage |
 | --- | --- | --- |
-| `[CslaImplementProperties]` | Enables automatic code generation for partial properties | Place on a partial class containing partial property declarations - requires a reference to the `Csla.Generator.AutoImplementProperties.CSharp` package |
+| `[CslaImplementProperties]` | Enables automatic code generation for partial properties | Place on a partial class containing partial property declarations - in CSLA 10 requires a reference to the `Csla.Generator.AutoImplementProperties.CSharp` package; in CSLA 11 the generator is bundled in the `Csla` package and that package is retired (remove the reference, or build error `CSLABUILD001` is reported) |
+| `[DataPortalExtensions]` | **CSLA 11:** Generates strongly typed extension methods on `IDataPortal<T>` / `IChildDataPortal<T>` for the class's `[Create]`, `[Fetch]`, `[Execute]`, `[Delete]`, `[CreateChild]`, and `[FetchChild]` methods | Place on a business class, or use `[assembly: DataPortalExtensions]`; optional `Prefix` property. See `v11/DataPortalExtensions.md` |
+| `[NoDataPortalExtension]` | **CSLA 11:** Excludes a class or an operation method from `[DataPortalExtensions]` generation | Place on a class or operation method |
 | `[ObjectAuthorizationRules]` | Marks a static method that defines object-level authorization rules | Place on a static method like `AddObjectAuthorizationRules()` |
 
 > **Note**: The `[Serializable]` attribute is no longer required or recommended in CSLA 9 and later. CSLA uses its own serialization mechanism and does not require classes to be marked with this attribute.
@@ -62,13 +65,21 @@ These attributes mark methods that implement data portal operations. Methods are
 
 | Attribute | Operation Type | Used In | Detailed Doc |
 | --- | --- | --- | --- |
-| `[Create]` | Initialize a new object with default values | Root and child objects | `DataPortalOperationCreate.md` |
-| `[Fetch]` | Retrieve an existing object from data store | Root and child objects | `DataPortalOperationFetch.md` |
-| `[Insert]` | Save a new object to the data store | Root and child objects | `DataPortalOperationInsert.md` |
-| `[Update]` | Update an existing object in the data store | Root and child objects | `DataPortalOperationUpdate.md` |
-| `[Delete]` | Delete an object by criteria without fetching it first | Root objects only | `DataPortalOperationDelete.md` |
-| `[DeleteSelf]` | Delete the current object instance | Root and child objects | `DataPortalOperationDelete.md` |
-| `[Execute]` | Execute a command operation | Command objects only | `DataPortalOperationExecute.md` |
+| `[Create]` | Initialize a new object with default values | Root objects | `DataPortalOperationCreate.md` |
+| `[Fetch]` | Retrieve an existing object from data store | Root objects | `DataPortalOperationFetch.md` |
+| `[Insert]` | Save a new object to the data store | Root objects | `DataPortalOperationInsert.md` |
+| `[Update]` | Update an existing object in the data store | Root objects | `DataPortalOperationUpdate.md` |
+| `[Delete]` | Delete an object by criteria without fetching it first | Root objects | `DataPortalOperationDelete.md` |
+| `[DeleteSelf]` | Delete the current object instance | Root objects | `DataPortalOperationDelete.md` |
+| `[Execute]` | Execute a command operation | Command objects | `DataPortalOperationExecute.md` |
+| `[CreateChild]` | Initialize a new child object | Child objects | `DataPortalGuide.md` |
+| `[FetchChild]` | Load a child object with data provided by the parent | Child objects | `DataPortalGuide.md` |
+| `[InsertChild]` | Save a new child object | Child objects | `DataPortalGuide.md` |
+| `[UpdateChild]` | Update an existing child object | Child objects | `DataPortalGuide.md` |
+| `[DeleteSelfChild]` | Delete the current child object | Child objects | `DataPortalGuide.md` |
+| `[ExecuteChild]` | Execute a child command operation | Child command objects | `DataPortalGuide.md` |
+
+> **CSLA 11:** Only methods with one of these attributes are invoked. Legacy method names such as `DataPortal_Fetch` or `Child_Update` are not found by name, and `DataPortalOptions.UseLegacyOperationMethods` is removed. Declare classes that contain operation methods `partial` so the bundled source generator can dispatch to them without reflection (analyzer CSLA0024).
 
 ### Other Method/Property Attributes
 
@@ -91,11 +102,13 @@ There are object-oriented stereotypes supported by the CSLA base classes. For a 
 | Read-only child | `ReadOnlyBase<T>` | A read-only business domain type that supports authorization rules, read-only properties, data binding, and the child data portal child fetch operation | T is the type of business class |
 | Read-only root list | `ReadOnlyListBase<T, C>` | A read-only business domain type that supports authorization rules, read-only properties, data binding, and the data portal fetch operation | T is the type of the list, C is the type of child class |
 | Read-only child list | `ReadOnlyListBase<T, C>` | A read-only business domain type that supports authorization rules, read-only properties, data binding, and the child data portal child fetch operation | T is the type of the list, C is the type of child class |
-| Editable document | `BusinessDocumentBase<T, C>` | An editable business domain type that combines managed properties (with full rules engine, validation, authorization, and change tracking) and an embedded collection of editable child objects; can be used as a root or child-that-is-a-parent; .NET 8+ only | T is the type of the document class, C is the type of the child class |
+| Editable document | `BusinessDocumentBase<T, C>` | An editable business domain type that combines managed properties (with full rules engine, validation, authorization, and change tracking) and an embedded collection of editable child objects; can be used as a root or child-that-is-a-parent; modern .NET only (.NET 8+ in CSLA 10, .NET 10+ in CSLA 11), not .NET Framework or netstandard | T is the type of the document class, C is the type of the child class |
 | Dynamic root list | `DynamicListBase<T, C>` | A business domain type representing a list of editable root objects; supports data binding, and data portal create and fetch operations; individual root objects are updated or deleted individually; primarily designed for data binding against an data grid control in the UI |  T is the type of the list, C is the type of the contained editable root class |
 | Command | `CommandBase<T>` | A business domain type representing a command that can be executed within the business domain; examples: does a person exist?, ship an order, archive an invoice | T is the type of the command class |
 | Unit of work (read or fetch data) | A business type representing an operation where multiple other types of root objects are retrieved at once; this type has a property for each of the root object types being retrieved, and its data portal fetch operation contains code to call the data portal to fetch each of the root objects to be returned | `ReadOnlyBase<T>` | T is the type of the unit of work business class |
 | Unit of work (modify or update data) | A business type representing an operation where multiple other types of root objects are updated, saved, or deleted at once; this type has a property for each of the root object types being modified, and its data portal execute operation contains code to call the data portal to save each of the root objects | `CommandBase<T>` | T is the type of the unit of work business class |
+
+> **CSLA 11:** Editable lists (`BusinessListBase`, `BusinessBindingListBase`, `DynamicListBase`, `DynamicBindingListBase`) enforce `AllowNew` and `AllowRemove`: adding items while `AllowNew` is `false`, or removing items while `AllowRemove` is `false`, throws `NotSupportedException`. `AllowRemove` now defaults to `true` for all of them. If a fetch method sets these to `false`, set them after loading the items. In CSLA 9 and 10 these properties only informed data binding.
 
 ## Data portal and data access
 
@@ -234,13 +247,13 @@ CSLA tracks object metastate for various reasons.
 
 | State | Description | Methods to Check |
 | --- | --- | --- |
-| Busy | Object is running one or more async business rules | `IsBusy` property |
+| Busy | Object is running one or more async business rules (in CSLA 11, also while an async per-type authorization rule used by `IsSavable` is running) | `IsBusy` property |
 | New | Object is new and needs to be inserted | `IsNew` property |
 | Clean | Object exists and has no changes | `!IsDirty` |
 | Dirty | Object has unsaved changes | `IsDirty` property |
 | Deleted | Object is marked for deletion | `IsDeleted` property |
 | Valid | Object passes all business rules | `IsValid` property |
-| Savable | Object can be saved (dirty and valid, or deleted) | `IsSavable` property |
+| Savable | Object can be saved: dirty, valid, not busy, and the user is authorized (`CreateObject`, `EditObject`, or `DeleteObject` rule) | `IsSavable` property |
 
 ### Metastate Manipulation Methods
 
@@ -257,7 +270,7 @@ CSLA tracks object metastate for various reasons.
 
 Business rules provide validation and calculation logic. Added in the `AddBusinessRules()` override method using `BusinessRules.AddRule()`.
 
-**Common rule types**: `Required`, `MaxLength`, `MinLength`, `Range`, `RegEx`, `Dependency`
+**Common rule types** (in `Csla.Rules.CommonRules`): `Required`, `MaxLength`, `MinLength`, `MinValue<T>`, `MaxValue<T>`, `RegExMatch`, `Dependency`, `Lambda`, `InfoMessage`, `DataAnnotation` (use the `[Range]` data annotation for range checks)
 
 **Data Annotations**: CSLA automatically converts standard data annotations (`[Required]`, `[StringLength]`, `[EmailAddress]`, etc.) into business rules.
 
@@ -283,7 +296,7 @@ Example: `BusinessRules.AddRule(new Rules.CommonRules.IsInRole(AuthorizationActi
 
 Call `BusinessRules.CheckRules()` or `await BusinessRules.CheckRulesAsync()` at the end of data portal operations to run all rules and populate validation state.
 
-**When to use async**: Use `CheckRulesAsync()` when the business class has any async business rules. It also works with synchronous rules, making it the recommended default approach.
+**When to use async**: Use `BusinessRules.CheckRulesAsync()` (there is no protected `CheckRulesAsync()` method on `BusinessBase`) when the business class has any async business rules. It also works with synchronous rules, making it the recommended default approach.
 
 ## Common Patterns and Best Practices
 
@@ -306,3 +319,16 @@ All data portal operations support both sync and async. Use async methods when c
 **Alternative**: Factory implementation - Data portal methods in separate factory class.
 
 See `Data-Access.md` for detailed patterns.
+
+## CSLA 11 Concepts
+
+| Term | Description |
+| --- | --- |
+| Target frameworks | CSLA 11 targets .NET 10 and .NET 11 (`net10.0`, `net11.0`), plus `netstandard2.0` and .NET Framework 4.6.2 through 4.8 for the `Csla` package. .NET 8 and .NET 9 are no longer targeted. UI packages target the matching `net10.0`/`net11.0` platform TFMs (for example `net11.0-windows`, `net11.0-android`). |
+| Bundled source generators | The CSLA source generators (property implementation, data portal operation dispatch, data portal extensions) ship inside the `Csla` package and run in any C# project that references it. The separate `Csla.Generator.AutoImplementProperties.CSharp` package is retired. |
+| `IDataPortalOperations` | An `internal` interface the generator nests inside each `partial` class that declares data portal operation methods. It has one member per operation method, so the data portal (via generated `IDataPortalOperationMapping` / `IDataPortalOperationNamedMapping` implementations) calls private operation methods directly instead of through reflection, and IDEs and the trimmer see them as used. Generated code; you don't implement it. See `v11/DataPortalOperationDispatch.md`. |
+| `[DataPortalExtensions]` | Opt-in attribute that generates strongly typed extension methods (sync and async) on `IDataPortal<T>` and `IChildDataPortal<T>` for a class's operation methods. `[Inject]` parameters are omitted. A generated name that would be hidden by an `IDataPortal<T>` instance method (for example `FetchAsync` for a method named `Fetch`) is not generated, so use `Prefix` or a distinct method name. See `v11/DataPortalExtensions.md`. |
+| `ITransactionScopeFactory` | Server-side service (`Csla.Server`) that creates the `TransactionScope` for `[Transactional(TransactionalTypes.TransactionScope)]` operations. It receives a `TransactionScopeFactoryContext` (object type, operation, method, `TransactionalAttribute`, business object, criteria). The default is `DefaultTransactionScopeFactory`; register your own with `AddServerSideDataPortal(cfg => cfg.RegisterTransactionScopeFactory<T>())`. See `v11/TransactionScopeFactory.md`. |
+| CSLA0014 | Analyzer (a warning in CSLA 11) that finds methods with a legacy operation name (`DataPortal_Fetch`, `Child_Update`, ...) but no operation attribute; its code fix adds the attribute. |
+| CSLA0024 | Analyzer warning: a type with data portal operation methods should be declared `partial` (including containing types) so the generator can implement its operations interface. Code fix adds `partial`. Non-partial classes still work through reflection. |
+| CSLA0025 | Analyzer warning: use the generated `[DataPortalExtensions]` method instead of calling an `IDataPortal<T>` method with untyped criteria. Code fix replaces the call. |

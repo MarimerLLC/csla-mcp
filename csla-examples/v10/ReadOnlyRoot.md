@@ -19,6 +19,7 @@ This example demonstrates a read-only customer information object.
 
 ```csharp
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Csla;
 
@@ -39,8 +40,8 @@ namespace MyApp.Business
             
             // Property-level authorization: only Admin can view Email
             BusinessRules.AddRule(
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.ReadProperty,
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.ReadProperty,
                     EmailProperty,
                     "Admin"));
         }
@@ -50,8 +51,8 @@ namespace MyApp.Business
         {
             // Object-level authorization
             BusinessRules.AddRule(typeof(CustomerInfo),
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.GetObject,
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.GetObject,
                     "Admin", "Manager", "User"));
         }
 
@@ -61,7 +62,7 @@ namespace MyApp.Business
             var data = await dal.GetAsync(id);
             
             if (data == null)
-                throw new DataNotFoundException($"Customer {id} not found");
+                throw new KeyNotFoundException($"Customer {id} not found");
             
             LoadProperty(IdProperty, data.Id);
             LoadProperty(NameProperty, data.Name);

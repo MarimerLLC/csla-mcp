@@ -108,7 +108,7 @@ using Csla;
 
 namespace MyApp.Business;
 
-public class AssetSurveyResult : SurveyResult<AssetSurveyResult>
+public partial class AssetSurveyResult : SurveyResult<AssetSurveyResult>
 {
     public static readonly PropertyInfo<string> AssetTagProperty = RegisterProperty<string>(nameof(AssetTag));
     public string AssetTag
@@ -160,7 +160,7 @@ using Csla;
 
 namespace MyApp.Business;
 
-public class ContactSurveyResult : SurveyResult<ContactSurveyResult>
+public partial class ContactSurveyResult : SurveyResult<ContactSurveyResult>
 {
     public static readonly PropertyInfo<string> ContactNameProperty = RegisterProperty<string>(nameof(ContactName));
     public string ContactName
@@ -219,7 +219,7 @@ using Csla;
 
 namespace MyApp.Business;
 
-public class SurveyResultList : BusinessListBase<SurveyResultList, ISurveyResult>
+public partial class SurveyResultList : BusinessListBase<SurveyResultList, ISurveyResult>
 {
     [Fetch]
     private async Task Fetch(
@@ -251,7 +251,8 @@ public class SurveyResultList : BusinessListBase<SurveyResultList, ISurveyResult
     {
         // BusinessListBase has no FieldManager; Child_Update drives the
         // [InsertChild]/[UpdateChild]/[DeleteSelfChild] operations on every item,
-        // including async ones.
+        // including async ones. (Child_Update is a protected helper you call
+        // explicitly; it is not found by name as an operation.)
         Child_Update();
     }
 }
@@ -334,7 +335,8 @@ interface.
 ## Constraint 3: Properties must be hand-coded
 
 The CSLA `[CslaImplementProperties]` source generator (from the
-`Csla.Generator.AutoImplementProperties.CSharp` package) only generates property
+`Csla.Generator.AutoImplementProperties.CSharp` package in CSLA 10; bundled in the
+`Csla` package in CSLA 11) only generates property
 implementations for a class whose **direct** base is a framework base class such
 as `BusinessBase<T>`. For any type in this pattern it emits an empty partial and
 the `partial` properties never get an implementation:
@@ -368,6 +370,8 @@ foreach (var item in list)
 }
 
 // Add a new polymorphic child through its own child data portal.
+// ContactSurveyResult has no [CreateChild] method, so the BusinessBase default
+// Child_Create runs (marked [CreateChild] in CSLA 11) and checks the rules.
 var newContact = await contactPortal.CreateChildAsync();
 newContact.ContactName = "Jane Doe";
 list.Add(newContact);
@@ -382,6 +386,10 @@ serializes each child by its actual type.
 
 ## Key Points
 
+* Declare the classes that have data portal operation methods `partial` (in
+  CSLA 11, analyzer CSLA0024 warns otherwise, and the bundled generator then
+  dispatches to the operation methods without reflection). `partial` alone does
+  not enable property generation; only `[CslaImplementProperties]` does.
 * Use a **CRTP abstract base** (`Base<T> where T : Base<T>`) so each concrete child
   gets its own property-registration identity. A shared non-generic base fails the
   moment a subclass adds a managed property.

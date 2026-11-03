@@ -27,6 +27,8 @@ Both client and server projects need the `Csla.Channels.RabbitMq` NuGet package:
 <PackageReference Include="Csla.Channels.RabbitMq" Version="9.0.0" />
 ```
 
+Use the same version as your `Csla` package (for example `10.x` with CSLA 10 or `11.x` with CSLA 11).
+
 ## Part 1: Server-Side Configuration
 
 Unlike HTTP or gRPC channels, the RabbitMQ server is typically a standalone console application that continuously listens for messages on a queue. It does not require ASP.NET Core.

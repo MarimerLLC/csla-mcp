@@ -2,6 +2,8 @@
 
 The `[Execute]` operation performs command objects that don't fit standard CRUD operations. Commands encapsulate business logic, calculations, or operations that don't map to a single entity.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Execute]`. A method named `DataPortal_Execute` without the attribute is never called. Declare the command class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## When to Use
 
 - Operations that don't map to standard CRUD (Create, Read, Update, Delete)
@@ -12,7 +14,7 @@ The `[Execute]` operation performs command objects that don't fit standard CRUD 
 
 ## Command Basics
 
-Commands inherit from `CommandBase<T>` and use CSLA 10's property generation:
+Commands inherit from `CommandBase<T>` and use the property generation available in CSLA 10 and later:
 
 ```csharp
 using Csla;
@@ -48,8 +50,8 @@ namespace MyApp.Business
     }
 }
 
-// Client usage
-var command = await taxPortal.ExecuteAsync(amount: 100.00m, region: "CA");
+// Client usage - criteria are passed positionally (ExecuteAsync takes params object[])
+var command = await taxPortal.ExecuteAsync(100.00m, "CA");
 Console.WriteLine($"Tax: {command.TaxAmount}, Total: {command.Total}");
 ```
 
@@ -86,13 +88,15 @@ public partial class SendEmail : CommandBase<SendEmail>
 
 // Client usage
 var command = await emailPortal.ExecuteAsync(
-    to: "user@example.com",
-    subject: "Hello",
-    body: "Message content");
+    "user@example.com",  // to
+    "Hello",             // subject
+    "Message content");  // body
 
 if (command.Success)
     Console.WriteLine("Email sent!");
 ```
+
+> **CSLA 11:** Add `[DataPortalExtensions]` to the command class to generate strongly typed extension methods for its `[Execute]` methods, so the compiler checks the criteria (and named arguments work). For example, with `[DataPortalExtensions(Prefix = "Portal")]` you can call `await emailPortal.PortalExecuteAsync(to: "user@example.com", subject: "Hello", body: "Message content")`. See `v11/DataPortalExtensions.md`.
 
 ### Pattern 2: Create, Load, Execute, Evaluate
 
@@ -109,6 +113,12 @@ public partial class ProcessOrder : CommandBase<ProcessOrder>
     // Output properties (private setters)
     public partial bool Success { get; private set; }
     public partial DateTime ProcessedDate { get; private set; }
+    
+    // Required so the client can call CreateAsync(); CommandBase has no default [Create] method
+    [Create]
+    [RunLocal]
+    private void Create()
+    { }
     
     [Execute]
     private async Task Execute([Inject] IOrderService orderService)
@@ -130,7 +140,7 @@ public partial class ProcessOrder : CommandBase<ProcessOrder>
 var command = await orderCommandPortal.CreateAsync();
 command.OrderId = 123;
 command.ProcessingNotes = "Rush order";
-await command.ExecuteAsync();
+command = await orderCommandPortal.ExecuteAsync(command);
 
 if (command.Success)
     Console.WriteLine($"Processed on {command.ProcessedDate}");
@@ -143,7 +153,7 @@ if (command.Success)
 3. **Input via Execute parameters (Pattern 1) is preferred** over input properties (Pattern 2)
 4. **Output properties should have private setters**
 5. **No business rules** - `CommandBase` doesn't support validation
-6. **Use `[Transactional]` attribute** if command needs transaction
+6. **Use `[Transactional]` attribute** if command needs transaction (see the transaction section of `DataPortalGuide.md`; in CSLA 11 unspecified attribute values use the `DataOptions` defaults at runtime, and `ITransactionScopeFactory` controls how the `TransactionScope` is created - see `v11/TransactionScopeFactory.md`)
 7. **Commands don't have `IsNew`, `IsDirty`, or change tracking**
 
 ## Common Command Examples

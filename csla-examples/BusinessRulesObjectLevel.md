@@ -237,11 +237,11 @@ Use the `[ObjectAuthorizationRules]` attribute for type-level authorization:
 public static void AddObjectAuthorizationRules(IAddObjectAuthorizationRulesContext context)
 {
     // Only Admin users can create Order objects
-    context.Rules.AddRule(typeof(Order),
+    Csla.Rules.BusinessRules.AddRule(typeof(Order),
         new IsInRole(AuthorizationActions.CreateObject, "Admin"));
 
     // Only Admin and Manager users can delete Order objects
-    context.Rules.AddRule(typeof(Order),
+    Csla.Rules.BusinessRules.AddRule(typeof(Order),
         new IsInRole(AuthorizationActions.DeleteObject, "Admin", "Manager"));
 
     // Anyone can fetch orders (no rule = allowed)
@@ -327,11 +327,11 @@ protected override void AddBusinessRules()
 
 ### Manual Trigger
 
-Object-level rules run when `CheckRules()` is called:
+Object-level rules run when `BusinessRules.CheckRules()` or `BusinessRules.CheckRulesAsync()` is called:
 
 ```csharp
 [Create]
-private void Create()
+private async Task Create()
 {
     LoadProperty(StatusProperty, "Draft");
     LoadProperty(CreatedDateProperty, DateTime.UtcNow);

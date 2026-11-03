@@ -13,7 +13,7 @@ The parent cannot use standard `Dependency` rules because those only work for pr
 
 1. Override the virtual `OnChildChanged` method
 2. Examine the event args to determine what changed
-3. Call `CheckRulesAsync()` to trigger rules on the appropriate parent property
+3. Call `BusinessRules.CheckRulesAsync()` to trigger rules on the appropriate parent property
 
 ## Complete Implementation Example
 
@@ -229,7 +229,7 @@ namespace MyApp.Business
 
             // Rule to calculate order total from the child list
             // This rule is attached to the LineItems property and will be
-            // triggered when we call CheckRulesAsync(LineItemsProperty)
+            // triggered when we call BusinessRules.CheckRulesAsync(LineItemsProperty)
             BusinessRules.AddRule(new CalcOrderTotal(LineItemsProperty, OrderTotalProperty));
         }
 
@@ -255,7 +255,7 @@ namespace MyApp.Business
                         changedProperty == nameof(LineItemEdit.LineItemTotal))
                     {
                         // Trigger rules on the LineItems property to recalculate OrderTotal
-                        await CheckRulesAsync(LineItemsProperty);
+                        await BusinessRules.CheckRulesAsync(LineItemsProperty);
                     }
                 }
             }
@@ -264,13 +264,13 @@ namespace MyApp.Business
             if (e.ListChangedArgs != null)
             {
                 // ListChanged indicates items were added, removed, or moved
-                await CheckRulesAsync(LineItemsProperty);
+                await BusinessRules.CheckRulesAsync(LineItemsProperty);
             }
 
             // Alternative: handle CollectionChanged for more detailed info
             if (e.CollectionChangedArgs != null)
             {
-                await CheckRulesAsync(LineItemsProperty);
+                await BusinessRules.CheckRulesAsync(LineItemsProperty);
             }
         }
 
@@ -373,7 +373,7 @@ namespace MyApp.Business
     /// <summary>
     /// Calculates the order total by summing all line item totals.
     /// This rule is attached to the LineItems property so it runs
-    /// when CheckRulesAsync(LineItemsProperty) is called.
+    /// when BusinessRules.CheckRulesAsync(LineItemsProperty) is called.
     /// </summary>
     public class CalcOrderTotal : BusinessRule
     {
@@ -481,13 +481,13 @@ When you detect a relevant child change, trigger rules on the appropriate parent
 
 ```csharp
 // Trigger rules on a specific property
-await CheckRulesAsync(LineItemsProperty);
+await BusinessRules.CheckRulesAsync(LineItemsProperty);
 
 // This causes any rules attached to LineItemsProperty to execute,
 // which can calculate dependent properties like OrderTotal
 ```
 
-## Alternative Approach: Using CheckRulesAsync with Specific Property
+## Alternative Approach: Using BusinessRules.CheckRulesAsync with Specific Property
 
 Instead of attaching a rule to the child list property, you can trigger rules on the calculated property directly:
 
@@ -507,7 +507,7 @@ protected override async void OnChildChanged(ChildChangedEventArgs e)
     if (ShouldRecalculateTotal(e))
     {
         // Trigger rules on the calculated property directly
-        await CheckRulesAsync(OrderTotalProperty);
+        await BusinessRules.CheckRulesAsync(OrderTotalProperty);
     }
 }
 
@@ -565,20 +565,20 @@ protected override async void OnChildChanged(ChildChangedEventArgs e)
     {
         case SubItemEdit subItem:
             // Handle sub-item changes
-            await CheckRulesAsync(LineItemsProperty);
+            await BusinessRules.CheckRulesAsync(LineItemsProperty);
             break;
             
         case LineItemEdit lineItem:
             // Handle line item changes
             if (IsRelevantLineItemChange(e))
             {
-                await CheckRulesAsync(LineItemsProperty);
+                await BusinessRules.CheckRulesAsync(LineItemsProperty);
             }
             break;
             
         case LineItemList list:
             // Handle list-level changes
-            await CheckRulesAsync(LineItemsProperty);
+            await BusinessRules.CheckRulesAsync(LineItemsProperty);
             break;
     }
 }
@@ -633,7 +633,7 @@ protected override async void OnChildChanged(ChildChangedEventArgs e)
             propName == nameof(LineItemEdit.UnitPrice) ||
             propName == nameof(LineItemEdit.LineItemTotal))
         {
-            await CheckRulesAsync(LineItemsProperty);
+            await BusinessRules.CheckRulesAsync(LineItemsProperty);
         }
     }
 }
@@ -663,7 +663,7 @@ protected override async void OnChildChanged(ChildChangedEventArgs e)
         await Task.Delay(100, _recalculateCts.Token);
         
         // No more changes - recalculate
-        await CheckRulesAsync(LineItemsProperty);
+        await BusinessRules.CheckRulesAsync(LineItemsProperty);
     }
     catch (TaskCanceledException)
     {
@@ -721,7 +721,7 @@ The `OnChildChanged` override enables parent objects to respond to changes anywh
 1. **Override OnChildChanged** - simpler than event subscription, works automatically after serialization
 2. **Call base.OnChildChanged(e)** - ensures the `ChildChanged` event is raised for external subscribers
 3. **Examine ChildChangedEventArgs** to determine what changed
-4. **Call CheckRulesAsync()** on the appropriate property to trigger parent-level rules
+4. **Call `BusinessRules.CheckRulesAsync(property)`** on the appropriate property to trigger parent-level rules
 5. **Filter events** to avoid unnecessary rule execution
 
 ## Related Documentation

@@ -33,8 +33,8 @@ namespace MyApp.Business
         public static void AddObjectAuthorizationRules()
         {
             BusinessRules.AddRule(typeof(CustomerInfoList),
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.GetObject,
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.GetObject,
                     "Admin", "Manager", "User"));
         }
 

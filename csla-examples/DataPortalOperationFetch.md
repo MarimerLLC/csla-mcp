@@ -2,6 +2,8 @@
 
 The `[Fetch]` operation retrieves an existing business object from a data source. This is invoked when calling `IDataPortal<T>.FetchAsync()` on the client.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Fetch]`. A method named `DataPortal_Fetch` without the attribute is never called. Declare the business class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## When to Use
 
 - Loading existing editable root objects (`BusinessBase<T>`)
@@ -94,8 +96,8 @@ private async Task Fetch(int id, [Inject] ICustomerDal dal)
 Query by multiple criteria:
 
 ```csharp
-// Client code
-var customer = await customerPortal.FetchAsync(customerId: 123, includeInactive: true);
+// Client code - criteria values are passed positionally (FetchAsync takes params object[])
+var customer = await customerPortal.FetchAsync(123, true);
 
 // Server-side Fetch operation
 [Fetch]
@@ -114,6 +116,8 @@ private async Task Fetch(int customerId, bool includeInactive, [Inject] ICustome
     await BusinessRules.CheckRulesAsync();
 }
 ```
+
+> **CSLA 11:** Add `[DataPortalExtensions]` to the business class to generate strongly typed extension methods on `IDataPortal<T>` from its operation methods, so criteria are checked by the compiler (for example `await customerPortal.PortalFetchAsync(123, true)` with `[DataPortalExtensions(Prefix = "Portal")]`). See `v11/DataPortalExtensions.md`.
 
 ## Fetch with Criteria Object
 
@@ -188,12 +192,10 @@ public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
     {
         var data = await dal.GetAsync(id);
         
-        using (BypassPropertyChecks)
-        {
-            Id = data.Id;
-            Name = data.Name;
-            Email = data.Email;
-        }
+        // ReadOnlyBase has no BypassPropertyChecks; use LoadProperty
+        LoadProperty(IdProperty, data.Id);
+        LoadProperty(NameProperty, data.Name);
+        LoadProperty(EmailProperty, data.Email);
         
         // Read-only objects typically don't need CheckRulesAsync
     }
@@ -204,8 +206,8 @@ public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
 
 1. **Always use async/await** for database operations
 2. **Use `LoadProperty` or `BypassPropertyChecks`** to avoid triggering change tracking
-3. **Call `CheckRulesAsync()` at the end** to validate loaded data (editable objects)
-4. **Read-only objects** typically don't need `CheckRulesAsync()`
+3. **Call `await BusinessRules.CheckRulesAsync()` at the end** to validate loaded data (editable objects)
+4. **Read-only objects** typically don't need `BusinessRules.CheckRulesAsync()`
 5. **Handle not found scenarios** - throw exception or return null depending on requirements
 6. **Load child objects in same query** when possible to avoid N+1 queries
 
@@ -215,7 +217,7 @@ public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
 
 ```csharp
 [Fetch]
-private async Task Fetch(int id, [Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task Fetch(int id, [Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     var data = await dal.GetAsync(id);
     

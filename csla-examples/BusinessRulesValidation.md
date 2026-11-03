@@ -359,11 +359,12 @@ protected override void AddBusinessRules()
     BusinessRules.AddRule(new MinLength(PasswordProperty, 8));
 
     // Regex patterns
-    BusinessRules.AddRule(new RegEx(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$"));
-    BusinessRules.AddRule(new RegEx(PhoneProperty, @"^\d{10}$"));
+    BusinessRules.AddRule(new RegExMatch(EmailProperty, @"^[^@]+@[^@]+\.[^@]+$"));
+    BusinessRules.AddRule(new RegExMatch(PhoneProperty, @"^\d{10}$"));
 
     // Numeric ranges
-    BusinessRules.AddRule(new Range<int>(AgeProperty, 0, 120));
+    BusinessRules.AddRule(new MinValue<int>(AgeProperty, 0));
+    BusinessRules.AddRule(new MaxValue<int>(AgeProperty, 120));  // or use the [Range(0, 120)] data annotation
     BusinessRules.AddRule(new MinValue<decimal>(PriceProperty, 0));
 }
 ```

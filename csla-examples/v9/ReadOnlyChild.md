@@ -62,8 +62,8 @@ namespace MyApp.Business
             
             // Property-level authorization: only Manager can view Price
             BusinessRules.AddRule(
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.ReadProperty,
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.ReadProperty,
                     PriceProperty,
                     "Manager", "Admin"));
         }
@@ -240,8 +240,8 @@ protected override void AddBusinessRules()
     
     // Only managers can view sensitive properties
     BusinessRules.AddRule(
-        new Rules.CommonRules.IsInRole(
-            Rules.AuthorizationActions.ReadProperty,
+        new Csla.Rules.CommonRules.IsInRole(
+            Csla.Rules.AuthorizationActions.ReadProperty,
             SalaryProperty,
             "Manager", "Admin"));
 }

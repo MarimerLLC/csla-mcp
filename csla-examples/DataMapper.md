@@ -26,7 +26,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
 }
 ```
 
-**CSLA 10:**
+**CSLA 10 and later:**
 
 ```csharp
 [Fetch]
@@ -38,11 +38,11 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
     // Map all matching properties from DAL object to business object
     Csla.Data.DataMapper.Map(customerData, this);
 
-    await CheckRulesAsync();
+    await BusinessRules.CheckRulesAsync();
 }
 ```
 
-> **Note:** In CSLA 10, it is recommended to use `await CheckRulesAsync()` instead of `BusinessRules.CheckRules()` to ensure that asynchronous business rules execute properly.
+> **Note:** In CSLA 10 and later, it is recommended to use `await BusinessRules.CheckRulesAsync()` instead of `BusinessRules.CheckRules()` to ensure that asynchronous business rules execute properly. (`CheckRulesAsync()` is not a protected method of `BusinessBase`; call it through the `BusinessRules` property.)
 
 This approach works when:
 - Property names match between source and target objects
@@ -66,7 +66,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
     // Set ignored properties manually if needed
     LoadProperty(CreatedDateProperty, DateTime.Now);
 
-    await CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
+    await BusinessRules.CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
 }
 ```
 
@@ -101,7 +101,7 @@ private async Task Fetch(int id, [Inject] ICustomerDal customerDal)
     // Perform the mapping using the DataMap
     Csla.Data.DataMapper.Map(customerData, this, map);
 
-    await CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
+    await BusinessRules.CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
 }
 ```
 
@@ -192,7 +192,7 @@ var value = Csla.Data.DataMapper.GetFieldValue(target, "_id");
 1. **Use the simplest approach** - Start with basic `Map(source, target)` unless you need special handling
 2. **Use ignore lists** when a few properties need special handling
 3. **Use DataMap** when property names differ significantly or you need complex mappings
-4. **Always check business rules after mapping** - Use `await CheckRulesAsync()` in CSLA 10 or `BusinessRules.CheckRules()` in CSLA 9 after mapping data in Fetch/Create operations
+4. **Always check business rules after mapping** - Use `await BusinessRules.CheckRulesAsync()` in CSLA 10 and later, or `BusinessRules.CheckRules()` in CSLA 9 after mapping data in Fetch/Create operations
 5. **Consider type compatibility** - While DataMapper handles many conversions, ensure your types are reasonably compatible
 6. **Map efficiently** - Mapping in one call is more efficient than multiple `LoadProperty` calls for many properties
 
@@ -206,7 +206,7 @@ private async Task Fetch(int id, [Inject] IPersonDal dal)
 {
     var data = await dal.Get(id);
     Csla.Data.DataMapper.Map(data, this);
-    await CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
+    await BusinessRules.CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
 }
 ```
 
@@ -219,7 +219,7 @@ private async Task Fetch(int id, [Inject] IOrderDal dal)
     var data = await dal.Get(id);
     // Don't map Total - it will be calculated by business rules
     Csla.Data.DataMapper.Map(data, this, "Total");
-    await CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
+    await BusinessRules.CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
 }
 ```
 
@@ -237,7 +237,7 @@ private async Task Fetch(int id, [Inject] IProductDal dal)
     map.AddPropertyMapping("UnitPrice", "Price");
 
     Csla.Data.DataMapper.Map(data, this, map);
-    await CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
+    await BusinessRules.CheckRulesAsync();  // Use BusinessRules.CheckRules() in CSLA 9
 }
 ```
 

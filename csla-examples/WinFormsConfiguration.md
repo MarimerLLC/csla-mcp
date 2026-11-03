@@ -162,7 +162,7 @@ namespace WinFormsExample.Pages
       personEditBindingSource.DataSource = _person;
     }
 
-    private void saveButton_Click(object sender, EventArgs e)
+    private async void saveButton_Click(object sender, EventArgs e)
     {
       personEditBindingSource.EndEdit();
       _person = await _person.SaveAsync();
@@ -204,7 +204,7 @@ namespace BrownfieldWinForms.Pages
       personEditBindingSource.DataSource = _person;
     }
 
-    private void saveButton_Click(object sender, EventArgs e)
+    private async void saveButton_Click(object sender, EventArgs e)
     {
       personEditBindingSource.EndEdit();
       _person = await _person.SaveAsync();
@@ -243,6 +243,6 @@ builder.Services.AddCsla(options => options
 2.  **Use a host builder** - Configure your application using the `IHostBuilder` for a modern, DI-first approach.
 3.  **Use the `BindingSource` component** - This is the best way to manage data binding between your UI controls and CSLA business objects.
 4.  **Use async methods** - Prefer `FetchAsync`, `SaveAsync`, etc. for a responsive user interface.
-5.  **Handle validation** - Check `IsSavable` before calling `SaveAsync()`.
+5.  **Handle validation** - Check `IsSavable` before calling `SaveAsync()`. In CSLA 11, `IsSavable` can be `false` while an async per-type authorization rule is running (the object is busy); `await obj.WaitForIdle()` first if your rules are async.
 6.  **Register DAL services** - Use dependency injection for data access layer components if using the local data portal.
 
