@@ -634,6 +634,39 @@ Implementation rules for a custom store:
 - `SessionManager` calls the store synchronously: if a `ValueTask` isn't already complete, it blocks on it. Keep store operations fast, and avoid code that needs a synchronization context.
 - The server-side context manager changes the `Session` instance that `GetSessionAsync` returned in place, for example when `LocalContext` or `ClientContext` is set. It doesn't call `AddOrUpdateSessionAsync` for those changes. `AddOrUpdateSessionAsync` runs when a session is first created and when a WebAssembly client sends its state back through `CslaStateController`. A store that returns a new copy on every read (such as one that deserializes from Redis each time) won't keep in-place changes unless it handles that itself, for example by keeping the live instances in a local cache and writing them through.
 
+### Purging Expired Sessions (CSLA 11+)
+
+> **Applies to CSLA 11 and later.** In earlier versions the app has to call `ISessionManager.PurgeSessions(expiration)` on its own schedule.
+
+Sessions stay in the `ISessionStore` until something calls `ISessionManager.PurgeSessions`. Call `AddSessionPurging` (in `Csla.AspNetCore`) to register a hosted background service that does it periodically:
+
+```csharp
+builder.Services.AddCsla(options => options
+    .AddAspNetCore()
+    .AddServerSideBlazor(blazor => blazor.UseInMemoryApplicationContextManager = false)
+    .AddSessionPurging(purge =>
+    {
+        purge.Interval = TimeSpan.FromMinutes(5);
+        purge.Expiration = TimeSpan.FromHours(1);
+    }));
+```
+
+| `SessionPurgingOptions` property | Default | Purpose |
+| --- | --- | --- |
+| `Interval` | 5 minutes | How often the service calls `PurgeSessions` |
+| `Expiration` | 1 hour | How long a session can go untouched before it's removed |
+
+How the service behaves:
+
+- It's opt-in. Nothing purges sessions unless you call `AddSessionPurging` or call `PurgeSessions` yourself.
+- The first purge runs one `Interval` after the app starts. Both values must be greater than zero, or `AddSessionPurging` throws `ArgumentOutOfRangeException`.
+- It calls `ISessionManager.PurgeSessions`, so it works with every `ISessionStore` and with a custom `SessionManagerType`. The order of `AddSessionPurging` and `AddServerSideBlazor` doesn't matter.
+- A failed purge is logged as an error, and the next purge runs on schedule. One failure doesn't stop the service or the app.
+- If the session manager doesn't support purging (the no-op session manager used when `UseInMemoryApplicationContextManager = true`), the service logs a warning and stops.
+- A shared store refreshes the stored last-touched time of live sessions on each purge, so other servers don't remove them. Keep `Interval` well below `Expiration`.
+- It's server-side only. Blazor WebAssembly has nothing to purge, so don't call it in the client project.
+- To read the values from configuration, bind them in the delegate: `.AddSessionPurging(purge => builder.Configuration.GetSection("Csla:SessionPurging").Bind(purge))`.
+
 ### Using StateManager in Blazor Pages
 
 In your Blazor pages (especially those that may run in WebAssembly), inject and use `StateManager`:

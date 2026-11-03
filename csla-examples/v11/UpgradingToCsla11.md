@@ -14,6 +14,7 @@ This document applies to CSLA 11. It is a practical checklist for upgrading code
 8. If you use async per-type authorization rules, review `IsSavable` and save logic. [Details](#issavable-and-async-authorization-rules)
 9. Optional: adopt strongly typed data portal calls with `[DataPortalExtensions]`. [Details](#optional-strongly-typed-data-portal-calls)
 10. Only if the app is trimmed or compiled with NativeAOT: follow the trimming and NativeAOT guide. [Details](#only-if-you-use-trimming-or-nativeaot)
+11. Optional: if a Blazor server app schedules `ISessionManager.PurgeSessions` itself, replace that with `AddSessionPurging`. [Details](#optional-purge-expired-blazor-sessions-automatically)
 
 ## Target frameworks
 
@@ -432,6 +433,27 @@ var person = await portal.PortalFetchAsync(42);
 ```
 
 Once enabled, analyzer CSLA0025 (warning) flags untyped calls that a generated method can replace, with a code fix. See [DataPortalExtensions.md](DataPortalExtensions.md). If you used Stefan Ossendorf's `Csla.DataPortalExtensions` package, switch to the built-in generator.
+
+## Optional: purge expired Blazor sessions automatically
+
+When Blazor state management is on (`UseInMemoryApplicationContextManager = false`), the server keeps each user's session in the `ISessionStore` until something calls `ISessionManager.PurgeSessions`. In CSLA 10 the app had to schedule that call itself. CSLA 11 adds an opt-in hosted background service in `Csla.AspNetCore` that does it:
+
+```csharp
+// Before: app-specific timer or hosted service
+sessionManager.PurgeSessions(TimeSpan.FromHours(1));
+
+// After
+builder.Services.AddCsla(o => o
+  .AddAspNetCore()
+  .AddServerSideBlazor(b => b.UseInMemoryApplicationContextManager = false)
+  .AddSessionPurging(p =>
+  {
+    p.Interval = TimeSpan.FromMinutes(5);   // default: 5 minutes
+    p.Expiration = TimeSpan.FromHours(1);   // default: 1 hour
+  }));
+```
+
+Existing code that calls `PurgeSessions` keeps working, so this is optional. See "Purging Expired Sessions" in [BlazorConfiguration.md](../BlazorConfiguration.md#purging-expired-sessions-csla-11) for how the service behaves.
 
 ## Only if you use trimming or NativeAOT
 
