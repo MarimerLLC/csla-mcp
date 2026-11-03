@@ -110,6 +110,7 @@ External Links:
 - `DataPortalExtensions.md` - `[DataPortalExtensions]` strongly typed data portal extension methods
 - `DataPortalOperationDispatch.md` - Generated `IDataPortalOperations` dispatch and why classes should be `partial`
 - `TransactionScopeFactory.md` - `[Transactional]`, `DataOptions` transaction defaults and `ITransactionScopeFactory`
+- `AzureTableStorageSessionStore.md` - `Csla.Blazor.State.AzureTableStorage` package: Blazor session store in Azure Table Storage, client selection, multi-server behavior and purging
 - `Analyzers.md` - CSLA analyzer and generator diagnostics reference (CSLA0002-CSLA0025, CSLADP002-CSLADP011)
 
 ## Document Relationships

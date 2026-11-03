@@ -589,6 +589,8 @@ When `UseInMemoryApplicationContextManager = true`:
 
 When `UseInMemoryApplicationContextManager = false`, the server-side `SessionManager` (`Csla.Blazor.State.SessionManager` in `Csla.AspNetCore`) reads and writes sessions through an `ISessionStore` service. The default store is `InMemorySessionStore`, which keeps sessions in a `ConcurrentDictionary` in server memory. That keeps the old behavior, and it's fine for a single server. You don't need to change any configuration unless you want a different store.
 
+In CSLA 11, the `Csla.Blazor.State.AzureTableStorage` package provides a ready-made store that keeps sessions in Azure Table Storage, registered with `UseAzureTableStorageSessionStore`. See `v11/AzureTableStorageSessionStore.md`.
+
 To share sessions across load-balanced servers, or to keep them through a restart, implement `Csla.State.ISessionStore` and register it with `SessionStoreType`:
 
 ```csharp
