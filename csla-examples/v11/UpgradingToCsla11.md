@@ -14,7 +14,7 @@ This document applies to CSLA 11. It is a practical checklist for upgrading code
 8. If you use async per-type authorization rules, review `IsSavable` and save logic. [Details](#issavable-and-async-authorization-rules)
 9. Optional: adopt strongly typed data portal calls with `[DataPortalExtensions]`. [Details](#optional-strongly-typed-data-portal-calls)
 10. Only if the app is trimmed or compiled with NativeAOT: follow the trimming and NativeAOT guide. [Details](#only-if-you-use-trimming-or-nativeaot)
-11. Optional: if a Blazor server app schedules `ISessionManager.PurgeSessions` itself, replace that with `AddSessionPurging`. [Details](#optional-purge-expired-blazor-sessions-automatically)
+11. If a Blazor app uses state management (`UseInMemoryApplicationContextManager = false`), check `SessionExpiration`: sessions idle for 1 hour are now purged automatically. [Details](#blazor-sessions-are-purged-automatically)
 
 ## Target frameworks
 
@@ -434,26 +434,31 @@ var person = await portal.PortalFetchAsync(42);
 
 Once enabled, analyzer CSLA0025 (warning) flags untyped calls that a generated method can replace, with a code fix. See [DataPortalExtensions.md](DataPortalExtensions.md). If you used Stefan Ossendorf's `Csla.DataPortalExtensions` package, switch to the built-in generator.
 
-## Optional: purge expired Blazor sessions automatically
+## Blazor sessions are purged automatically
 
-When Blazor state management is on (`UseInMemoryApplicationContextManager = false`), the server keeps each user's session in the `ISessionStore` until something calls `ISessionManager.PurgeSessions`. In CSLA 10 the app had to schedule that call itself. CSLA 11 adds an opt-in hosted background service in `Csla.AspNetCore` that does it:
+When Blazor state management is on (`UseInMemoryApplicationContextManager = false`), the server keeps each user's session in the `ISessionStore` until something calls `ISessionManager.PurgeSessions`. In CSLA 10 the app had to schedule that call itself, and sessions were never removed otherwise. In CSLA 11, `AddServerSideBlazor` registers a hosted background service that does it, on by default, and **removes sessions that haven't been touched for 1 hour**:
 
 ```csharp
 // Before: app-specific timer or hosted service
 sessionManager.PurgeSessions(TimeSpan.FromHours(1));
 
-// After
+// After: nothing to write; change the defaults if needed
 builder.Services.AddCsla(o => o
   .AddAspNetCore()
-  .AddServerSideBlazor(b => b.UseInMemoryApplicationContextManager = false)
-  .AddSessionPurging(p =>
+  .AddServerSideBlazor(b =>
   {
-    p.Interval = TimeSpan.FromMinutes(5);   // default: 5 minutes
-    p.Expiration = TimeSpan.FromHours(1);   // default: 1 hour
+    b.UseInMemoryApplicationContextManager = false;
+    b.SessionPurgeInterval = TimeSpan.FromMinutes(5);  // default: 5 minutes
+    b.SessionExpiration = TimeSpan.FromHours(1);       // default: 1 hour
+    // b.PurgeExpiredSessions = false;                 // to keep purging yourself
   }));
 ```
 
-Existing code that calls `PurgeSessions` keeps working, so this is optional. See "Purging Expired Sessions" in [BlazorConfiguration.md](../BlazorConfiguration.md#purging-expired-sessions-csla-11) for how the service behaves.
+* If users can be idle for more than an hour and should keep their session, raise `SessionExpiration`.
+* If the app already calls `PurgeSessions` on a schedule, remove that code or set `PurgeExpiredSessions = false`. Running both is harmless, but the shorter expiration wins.
+* `SessionPurgeInterval` must be from 1 millisecond to about 49.7 days, and `SessionExpiration` must be greater than zero, or `AddServerSideBlazor` throws `ArgumentOutOfRangeException`.
+
+See "Purging Expired Sessions" in [BlazorConfiguration.md](../BlazorConfiguration.md#purging-expired-sessions-csla-11) for how the service behaves.
 
 ## Only if you use trimming or NativeAOT
 

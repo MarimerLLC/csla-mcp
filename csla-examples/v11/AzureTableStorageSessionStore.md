@@ -37,13 +37,12 @@ builder.Services.AddCsla(o => o
     s.ConnectionString = builder.Configuration.GetConnectionString("SessionStorage");
     s.TableName = "CslaStateSessionManager";
     s.ApplicationDiscriminator = "MyApp";
-  })
-  .AddSessionPurging());
+  }));
 ```
 
 - `UseAzureTableStorageSessionStore` must come **after** `AddServerSideBlazor`. `AddServerSideBlazor` registers the in-memory store, and the last `ISessionStore` registration wins.
 - The store is registered as a singleton, because the singleton `SessionManager` depends on it.
-- `AddSessionPurging` (in `Csla.AspNetCore`) removes expired sessions and keeps live ones from being purged by other servers. See [Purging expired sessions](#purging-expired-sessions).
+- `AddServerSideBlazor` also registers a background service that removes expired sessions and keeps live ones from being purged by other servers. It's on by default. See [Purging expired sessions](#purging-expired-sessions).
 
 ## Choosing the TableServiceClient
 
@@ -118,32 +117,33 @@ The session is serialized with the app's configured CSLA `ISerializationFormatte
 - **Writes happen on save.** Session data is written to the table only by `AddOrUpdateSessionAsync`: when a session is first created, and when the WebAssembly client sends its state back through `CslaStateController`. Changes made in place on the server reach the table with the next save. If the server stops before that, those changes are lost.
 - **Use session affinity with more than one server.** Each server serves the sessions it has cached and doesn't reread them from the table, so a user must stay on the same server, as Blazor Server already requires. The table is what lets the session continue on another server after a restart, redeploy or failover.
 - **Read and write failures propagate.** A storage error surfaces as an exception from `SessionManager.GetSession` or `UpdateSession`, so the request fails instead of silently starting with an empty session.
-- **The table is created on first use.** The store is created the first time `ISessionStore` is resolved, and it calls `CreateIfNotExists` then. If storage isn't reachable, that first resolution throws. With `AddSessionPurging` this happens at app startup, because the purging service resolves the session manager when the host starts.
+- **The table is created on first use.** The store is created the first time `ISessionStore` is resolved, and it calls `CreateIfNotExists` then. If storage isn't reachable, that first resolution throws. With session purging on (the default), this happens at app startup, because the purging service resolves the session manager when the host starts.
 - **Business objects restored from the table** keep the `ApplicationContext` of the scope that deserialized them, the same as sessions that arrive through `CslaStateController`.
 
 ## Purging expired sessions
 
-Register `AddSessionPurging` (in `Csla.AspNetCore`) so the server calls `ISessionManager.PurgeSessions` on a schedule:
+With Blazor state management on, `AddServerSideBlazor` registers a background service that calls `ISessionManager.PurgeSessions` on a schedule. It's on by default; configure it on the `AddServerSideBlazor` options:
 
 ```csharp
-.AddSessionPurging(p =>
+.AddServerSideBlazor(b =>
 {
-  p.Interval = TimeSpan.FromMinutes(5);   // default: 5 minutes
-  p.Expiration = TimeSpan.FromHours(1);   // default: 1 hour
+  b.UseInMemoryApplicationContextManager = false;
+  b.SessionPurgeInterval = TimeSpan.FromMinutes(5);  // default: 5 minutes
+  b.SessionExpiration = TimeSpan.FromHours(1);       // default: 1 hour
 })
 ```
 
 Each purge with this store:
 
-1. Removes this server's cached sessions that haven't been touched within `Expiration`.
+1. Removes this server's cached sessions that haven't been touched within `SessionExpiration`.
 2. Writes the current `LastTouched` of every live cached session to the table. Only that column is written, so a session a request is changing is never serialized.
-3. Deletes the table rows for this `ApplicationDiscriminator` whose `LastTouched` is older than `Expiration` and that aren't cached on this server. Each delete uses the ETag from the query, so a row saved after the query is kept.
+3. Deletes the table rows for this `ApplicationDiscriminator` whose `LastTouched` is older than `SessionExpiration` and that aren't cached on this server. Each delete uses the ETag from the query, so a row saved after the query is kept.
 
-Step 2 is why purging matters with more than one server: without it, the stored `LastTouched` of a user who stays active on server A goes stale, and server B's purge deletes the row. Keep `Interval` well below `Expiration`, and run purging on every server.
+Step 2 is why purging matters with more than one server: without it, the stored `LastTouched` of a user who stays active on server A goes stale, and server B's purge deletes the row. Keep `SessionPurgeInterval` well below `SessionExpiration`, and leave purging on for every server.
 
-Purging is best effort. A failed refresh or delete is logged as a warning, a row skipped because it was saved after the query is logged at Debug, and the sweep continues. If the whole purge fails, `AddSessionPurging` logs the error and runs the next purge on schedule.
+Purging is best effort. A failed refresh or delete is logged as a warning, a row skipped because it was saved after the query is logged at Debug, and the sweep continues. If the whole purge fails, the service logs a warning and runs the next purge on schedule.
 
-If you don't use `AddSessionPurging`, call `ISessionManager.PurgeSessions(expiration)` periodically yourself.
+If you set `PurgeExpiredSessions = false`, call `ISessionManager.PurgeSessions(expiration)` periodically yourself.
 
 ## Local development with Azurite
 
@@ -162,6 +162,6 @@ docker run -p 10002:10002 mcr.microsoft.com/azure-storage/azurite azurite-table 
 - **Calling `UseAzureTableStorageSessionStore` before `AddServerSideBlazor`.** The in-memory store registered by `AddServerSideBlazor` wins, and sessions never reach the table.
 - **Leaving `UseInMemoryApplicationContextManager` at `true`.** No session store is used at all.
 - **Several apps sharing a table with the same `ApplicationDiscriminator`.** Each app's purge then treats the other app's rows as its own and deletes them by its own `Expiration`. Give each app its own value.
-- **Not purging.** Expired rows are never deleted. With more than one server, purging on some servers but not others is worse: a server that doesn't purge never refreshes the stored `LastTouched` of its live sessions, so the other servers delete them.
+- **Turning purging off without purging yourself.** With `PurgeExpiredSessions = false`, expired rows are never deleted. With more than one server, purging on some servers but not others is worse: a server that doesn't purge never refreshes the stored `LastTouched` of its live sessions, so the other servers delete them.
 - **Putting large or non-serializable values in `LocalContext` or `ClientContext`.** The session must serialize with the CSLA formatter and fit in 704 KiB.
 - **Adding the package to the WebAssembly client.** The store runs on the server only.
