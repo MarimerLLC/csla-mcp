@@ -21,7 +21,7 @@ This document applies to CSLA 11. It lists every Roslyn analyzer diagnostic ship
 | CSLA0004 | Warning | A CSLA business class has a public constructor with parameters. | No |
 | CSLA0005 | Error | The result of `Save()` is ignored (`obj.Save();` instead of `obj = obj.Save();`). | Yes: add the assignment |
 | CSLA0006 | Error | The result of `SaveAsync()` is ignored. | Yes: add the assignment |
-| CSLA0007 | Warning | A property that uses a managed backing field does more than call `GetProperty`/`SetProperty`/`ReadProperty`/`LoadProperty`. | No |
+| CSLA0007 | Warning | A property that uses a managed backing field does more than call `GetProperty`/`SetProperty`/`ReadProperty`/`LoadProperty`. A null-forgiving `!` on the call, as in `GetProperty(NameProperty)!`, is allowed (see `NullableProperties.md`). | No |
 | CSLA0008 | Error | A managed backing field (`PropertyInfo<T>`) is not `public static readonly`. | Yes: fix the field declaration |
 | CSLA0009 | Warning | A data portal operation is declared `public` on a business object interface. | No |
 | CSLA0010 | Warning | An operation method's criteria argument type is not serializable. | No |
