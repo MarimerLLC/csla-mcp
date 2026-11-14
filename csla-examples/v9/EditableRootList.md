@@ -32,9 +32,9 @@ namespace MyApp.Business
         public static void AddObjectAuthorizationRules()
         {
             BusinessRules.AddRule(typeof(OrderItemList), 
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.GetObject, "Admin", "Manager"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.GetObject, "Admin", "Manager"));
             BusinessRules.AddRule(typeof(OrderItemList), 
-                new Rules.CommonRules.IsInRole(Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
+                new Csla.Rules.CommonRules.IsInRole(Csla.Rules.AuthorizationActions.EditObject, "Admin", "Manager", "User"));
         }
 
         [Create]
@@ -207,4 +207,4 @@ private async Task FetchChild(OrderItemData data)
 * Items are editable root objects (not children)
 * Each item saved/deleted independently
 * Primarily for grid binding with row-level save/delete
-* See `DynamicRootList.md` for details.
+* Derives from `DynamicListBase<T>` (where `T` is the editable root item type)

@@ -4,6 +4,8 @@ Unit testing CSLA business rules in isolation allows you to verify rule behavior
 
 > ℹ️ You can use any mocking framework that provides comparable features and capabilities. This document uses the Rocks mocking framework as an example.
 
+> 💡 **CSLA 10.2 and later:** the `Csla.Testing` package has `BusinessRuleTester` and `AuthorizationRuleTester`. They run a rule in isolation without any mocks: you pass input values and assert on a result object (`HasErrors`, `ErrorMessages`, `GetOutValue<T>`, `HasPermission`, and so on). The same `ExecuteAsync` call works for sync and async rules. The package also has `CslaTestHost` for testing whole business objects through the data portal, and `RuleCache` for resetting rule registrations between tests. See [CslaTesting.md](CslaTesting.md). The mocking approach in this document still works on every CSLA version.
+
 ## Why Unit Test Rules in Isolation?
 
 CSLA business rules encapsulate validation, authorization, calculation, and other business logic. Testing rules in isolation provides:
@@ -355,6 +357,7 @@ ruleContextExpectations.Methods.AddInformationResult(Arg.Any<string>());
 
 ## Related Documentation
 
+- [CslaTesting.md](CslaTesting.md) - `Csla.Testing` package: rule testers, test host, and `RuleCache` (CSLA 10.2+)
 - [BusinessRules.md](BusinessRules.md) - Business rule implementation overview
 - [BusinessRulesValidation.md](BusinessRulesValidation.md) - Validation rules
 - [BusinessRulesCalculation.md](BusinessRulesCalculation.md) - Calculation rules

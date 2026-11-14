@@ -75,6 +75,12 @@ public partial class ProcessOrder : CommandBase<ProcessOrder>
     // Output property
     public partial string TrackingNumber { get; private set; }
 
+    // Required for processOrderPortal.CreateAsync(); CommandBase has no usable default create
+    [Create]
+    private void Create()
+    {
+    }
+
     [Execute]
     private async Task Execute([Inject] IOrderDal dal)
     {

@@ -2,6 +2,8 @@
 
 The `[Update]` operation persists changes to an existing business object. This is invoked automatically when calling `SaveAsync()` on a modified object.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Update]`. A method named `DataPortal_Update` without the attribute is never called. Declare the business class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## When to Use
 
 - Saving modified editable root objects (`BusinessBase<T>`) to the database
@@ -74,7 +76,7 @@ Track who modified and when:
 
 ```csharp
 [Update]
-private async Task Update([Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task Update([Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     var currentUser = appContext.User.Identity.Name;
     var now = DateTime.UtcNow;
@@ -147,9 +149,9 @@ private async Task Update([Inject] IOrderDal dal)
     // Update parent order
     await dal.UpdateAsync(data);
     
-    // Update children (insert new, update modified, delete removed)
-    var items = ReadProperty(ItemsProperty);
-    await FieldManager.UpdateChildrenAsync(items);
+    // Update children (insert new, update modified, delete removed);
+    // any arguments passed here are forwarded to the child operation methods
+    await FieldManager.UpdateChildrenAsync();
 }
 ```
 
@@ -185,7 +187,7 @@ private async Task Update([Inject] ICustomerDal dal)
 3. **Include row version** for optimistic concurrency
 4. **Update audit fields** before saving
 5. **Use `FieldManager.UpdateChildrenAsync()`** to save child collections
-6. **Don't call `CheckRulesAsync()`** - validation already happened before save
+6. **Don't call `BusinessRules.CheckRulesAsync()`** - validation already happened before save
 
 ## Common Patterns
 
@@ -195,7 +197,7 @@ Only update if specific conditions are met:
 
 ```csharp
 [Update]
-private async Task Update([Inject] ICustomerDal dal, [Inject] IApplicationContext appContext)
+private async Task Update([Inject] ICustomerDal dal, [Inject] ApplicationContext appContext)
 {
     // Verify user has permission to update
     if (!appContext.User.IsInRole("Manager"))
@@ -236,3 +238,4 @@ private async Task Update([Inject] ICustomerDal dal)
     
     await dal.PartialUpdateAsync(changedProperties);
 }
+```

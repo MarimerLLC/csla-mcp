@@ -45,7 +45,9 @@ public class CustomerCriteria
 
 ### Using with Data Portal
 
-Once configured, you can use the POCO type as a criteria parameter:
+Once configured, you can use the POCO type as a criteria parameter.
+
+> ⚠️ **Version note:** Passing a custom-serialized type as data portal **criteria** through a **remote** data portal (HTTP, gRPC, RabbitMQ, or WCF channel) requires **CSLA 10.2 or later**. In earlier versions only the local data portal works for such criteria. See [Custom Serializers for Data Portal Criteria](#custom-serializers-for-data-portal-criteria-csla-102).
 
 ```csharp
 // Configure the serializer for CustomerCriteria
@@ -57,11 +59,12 @@ services.AddCsla(options => options
                     PocoSerializer<CustomerCriteria>.CanSerialize)))));
 
 // Business object using the criteria
-[CslaImplementProperties]
-public partial class CustomerList : ReadOnlyListBase<CustomerList, CustomerInfo>
+[Serializable]
+public class CustomerList : ReadOnlyListBase<CustomerList, CustomerInfo>
 {
     [Fetch]
-    private async Task Fetch(CustomerCriteria criteria, [Inject] ICustomerDal dal)
+    private async Task Fetch(CustomerCriteria criteria, [Inject] ICustomerDal dal,
+        [Inject] IChildDataPortal<CustomerInfo> childPortal)
     {
         var customers = await dal.GetByCriteria(
             criteria.MinAge,
@@ -73,7 +76,7 @@ public partial class CustomerList : ReadOnlyListBase<CustomerList, CustomerInfo>
         {
             foreach (var customer in customers)
             {
-                Add(DataPortal.FetchChild<CustomerInfo>(customer));
+                Add(await childPortal.FetchChildAsync(customer));
             }
         }
     }
@@ -90,6 +93,87 @@ var criteria = new CustomerCriteria
 
 var customers = await customerListPortal.FetchAsync(criteria);
 ```
+
+## Custom Serializers for Data Portal Criteria (CSLA 10.2+)
+
+> **Applies to CSLA 10.2 and later.**
+
+Custom serializers have always worked for business object **property values**. In CSLA 10.2 they also work for **data portal criteria** sent through a remote data portal.
+
+### What Changed
+
+When the client passes a criteria value that isn't an `IMobileObject` (such as a POCO, an `int`, or a `string`), the data portal wraps it in an internal `PrimitiveCriteria` object to send it to the server. Multiple criteria values are packed into a `MobileList<object?>`.
+
+- **Before CSLA 10.2:** these wrappers wrote the value directly and never checked for custom serializers. A POCO criteria value, even with a registered `PocoSerializer<T>` or other `IMobileSerializer`, failed on a remote data portal with `NotSupportedException` ("Serialization of type object is not supported"). The local data portal worked, because it doesn't serialize criteria.
+- **CSLA 10.2 and later:** `PrimitiveCriteria` and `MobileList<T>` serialize a value through its registered custom serializer. A criteria type works through every remote channel once a custom serializer is registered for it.
+
+You don't need to change your code. Register the serializer and pass the object as criteria.
+
+### Example: Single Criteria Object
+
+```csharp
+public class ProductSearch
+{
+    public string Category { get; set; } = string.Empty;
+    public decimal MaxPrice { get; set; }
+    public bool InStockOnly { get; set; }
+}
+```
+
+Register the serializer on **both the client and the server**, because the server has to deserialize the criteria:
+
+```csharp
+// Client and server
+services.AddCsla(options => options
+    .Serialization(s => s
+        .UseMobileFormatter(m => m
+            .CustomSerializers.Add(
+                new TypeMap<ProductSearch, PocoSerializer<ProductSearch>>(
+                    PocoSerializer<ProductSearch>.CanSerialize)))));
+```
+
+```csharp
+[Serializable]
+public class ProductList : ReadOnlyListBase<ProductList, ProductInfo>
+{
+    [Fetch]
+    private async Task Fetch(ProductSearch criteria, [Inject] IProductDal dal,
+        [Inject] IChildDataPortal<ProductInfo> childPortal)
+    {
+        var items = await dal.SearchAsync(criteria.Category, criteria.MaxPrice, criteria.InStockOnly);
+        using (LoadListMode)
+        {
+            foreach (var item in items)
+                Add(await childPortal.FetchChildAsync(item));
+        }
+    }
+}
+
+// Client (remote data portal) - works in CSLA 10.2+
+var products = await productListPortal.FetchAsync(
+    new ProductSearch { Category = "Tools", MaxPrice = 50m, InStockOnly = true });
+```
+
+### Example: Multiple Criteria Values
+
+A custom-serialized object can be one of several criteria values:
+
+```csharp
+[Fetch]
+private async Task Fetch(int customerId, ProductSearch filter, [Inject] IOrderDal dal)
+{
+    // ...
+}
+
+var orders = await orderListPortal.FetchAsync(42, new ProductSearch { Category = "Tools" });
+```
+
+### Notes
+
+- Values with no registered serializer behave as before. An unsupported type still throws `NotSupportedException` on a remote data portal.
+- Native types (`int`, `string`, `Guid`, `DateTime`, and so on) and `null` are serialized as before.
+- The same per-item logic applies to any `MobileList<T>`. An item in a `MobileList<object>` that has a registered custom serializer is serialized through that serializer.
+- The wire format stays compatible. Streams from older clients without custom-serialized values still deserialize.
 
 ## Multiple Custom Serializers
 
@@ -335,7 +419,7 @@ private async Task Fetch(string region, int minAge, int maxAge, [Inject] ICustom
 
 ### Option 2: POCO with Custom Serializer
 
-Create a POCO type and register a custom serializer:
+Create a POCO type and register a custom serializer on client and server. With a remote data portal, POCO criteria need CSLA 10.2 or later (see [Custom Serializers for Data Portal Criteria](#custom-serializers-for-data-portal-criteria-csla-102)):
 
 ```csharp
 public class CustomerCriteria
@@ -388,3 +472,5 @@ public class CustomerCriteria : ReadOnlyBase<CustomerCriteria>
 - Custom serializers are called by `MobileFormatter` when it encounters a type it can't serialize natively
 - The `CanSerialize` method is used to determine if a serializer can handle a specific type
 - Multiple serializers can be registered, and `MobileFormatter` will use the first one that returns `true` from `CanSerialize`
+- Since CSLA 10.2, custom serializers also apply to data portal criteria values (single or multiple) sent through a remote data portal
+- Register custom serializers on every tier that serializes or deserializes the type, which is usually both client and server

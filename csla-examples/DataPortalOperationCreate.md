@@ -2,6 +2,8 @@
 
 The `[Create]` operation initializes a new business object instance with default values. This is invoked when calling `IDataPortal<T>.CreateAsync()` on the client.
 
+> **CSLA 11:** The data portal only calls methods that have an operation attribute such as `[Create]`. A method named `DataPortal_Create` (or any other legacy name) without the attribute is never called. Declare the business class `partial` (analyzer CSLA0024) so the bundled source generator can call the operation methods without reflection. See `v11/UpgradingToCsla11.md`.
+
 ## When to Use
 
 - Creating new editable root objects (`BusinessBase<T>`)
@@ -28,7 +30,7 @@ namespace MyApp.Business
         
         [Create]
         [RunLocal]  // Optimizes data portal - no remote call needed
-        private void Create()
+        private async Task Create()
         {
             // Set default values using LoadProperty
             LoadProperty(CreatedDateProperty, DateTime.UtcNow);
@@ -99,7 +101,7 @@ var customer = await customerPortal.CreateAsync("Initial Name");
 // Server-side Create operation
 [Create]
 [RunLocal]  // OK to use - no injected services
-private void Create(string initialName)
+private async Task Create(string initialName)
 {
     using (BypassPropertyChecks)
     {
@@ -137,7 +139,7 @@ private async Task Create([Inject] ICustomerDal dal, [Inject] IUserContext userC
 
 ## Important Notes
 
-1. **Always call `CheckRulesAsync()`** at the end to validate default values
+1. **Always call `await BusinessRules.CheckRulesAsync()`** at the end to validate default values
 2. **Use `LoadProperty` or `BypassPropertyChecks`** to set values without triggering change tracking
 3. **Mark as async** if you need to call any async DAL methods
 4. **Don't use for child objects** - they use `[CreateChild]` instead
@@ -165,8 +167,8 @@ private async Task Create([Inject] ICustomerDal dal, [Inject] IUserContext userC
 ### Create with Current User (No RunLocal)
 
 ```csharp
-[Create]  // No [RunLocal] - injecting IApplicationContext
-private void Create([Inject] IApplicationContext applicationContext)
+[Create]  // No [RunLocal] - injecting ApplicationContext
+private async Task Create([Inject] ApplicationContext applicationContext)
 {
     LoadProperty(CreatedDateProperty, DateTime.UtcNow);
     LoadProperty(CreatedByProperty, applicationContext.User.Identity.Name);
@@ -181,7 +183,7 @@ private void Create([Inject] IApplicationContext applicationContext)
 ```csharp
 [Create]
 [RunLocal]  // Optimized - no injected services
-private void Create()
+private async Task Create()
 {
     LoadProperty(CreatedDateProperty, DateTime.UtcNow);
     LoadProperty(StatusProperty, CustomerStatus.Prospect);

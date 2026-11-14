@@ -212,11 +212,11 @@ public RevalidatingInterceptor()
 }
 ```
 
-In CSLA 10, it requires an `IOptions<RevalidatingInterceptorOptions>` parameter:
+In CSLA 10, it requires the `ApplicationContext` and an `IOptions<RevalidatingInterceptorOptions>` parameter, both supplied by DI:
 
 ```csharp
 // CSLA 10
-public RevalidatingInterceptor(IOptions<RevalidatingInterceptorOptions> options)
+public RevalidatingInterceptor(ApplicationContext applicationContext, IOptions<RevalidatingInterceptorOptions> options)
 {
     // ...
 }
@@ -243,11 +243,11 @@ services.AddCsla();
 
 - **Data Portal Interceptors** - The `RevalidatingInterceptor` is one of several interceptors in the CSLA pipeline
 - **Business Rules** - Understanding when rules run is important for optimal configuration
-- **CheckRulesAsync** - Use `await CheckRulesAsync()` in CSLA 10 for async rule support
+- **CheckRulesAsync** - Use `await BusinessRules.CheckRulesAsync()` in CSLA 10 for async rule support
 
 ## Notes
 
 - The `RevalidatingInterceptor` is automatically registered when you call `services.AddCsla()`
 - If validation fails during Insert or Update (with default settings), an exception is thrown
-- The `IgnoreDeleteOperation` option only affects the `RevalidatingInterceptor` - you can still manually call `CheckRulesAsync()` in your Delete methods if needed
+- The `IgnoreDeleteOperation` option only affects the `RevalidatingInterceptor` - you can still manually call `await BusinessRules.CheckRulesAsync()` in your Delete methods if needed
 - Custom interceptors can be added alongside the `RevalidatingInterceptor`

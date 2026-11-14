@@ -135,6 +135,15 @@ High-performance binary protocol over HTTP/2:
 
 See [GrpcDataPortalConfiguration.md](GrpcDataPortalConfiguration.md) for configuration details.
 
+### WCF Channel (CSLA 10.1+)
+
+WCF-based channel for interoperating with WCF infrastructure (CoreWCF on .NET, System.ServiceModel on .NET Framework):
+- **Client**: `WcfProxy` (`Csla.Channels.Wcf.Client`)
+- **Server**: `WcfPortal` (`Csla.Channels.Wcf.Server`)
+- **Package**: `Csla.Channels.Wcf`
+
+See [WcfDataPortalConfiguration.md](WcfDataPortalConfiguration.md) for configuration details.
+
 ### RabbitMQ Channel
 
 Message queue-based asynchronous communication:

@@ -159,7 +159,7 @@ public class Program
 public partial class ProductList : ReadOnlyListBase<ProductList, ProductInfo>
 {
     [Fetch]
-    private async Task Fetch(AdvancedSearchCriteria criteria, [Inject] IProductDal dal)
+    private async Task Fetch(AdvancedSearchCriteria criteria, [Inject] IProductDal dal, [Inject] IChildDataPortal<ProductInfo> childPortal)
     {
         var products = await dal.AdvancedSearch(
             criteria.SearchTerm,
@@ -175,7 +175,7 @@ public partial class ProductList : ReadOnlyListBase<ProductList, ProductInfo>
         {
             foreach (var product in products)
             {
-                Add(DataPortal.FetchChild<ProductInfo>(product));
+                Add(await childPortal.FetchChildAsync(product));
             }
         }
     }

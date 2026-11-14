@@ -443,7 +443,7 @@ namespace CslaMcpServer.Tools
     }
 
     [McpServerTool, Description(fetchDescription)]
-    public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v10/Command.md' if multiple versions exist.")]string fileName)
+    public async Task<string> Fetch([Description("FileName from the search tool, or a version-specific path like 'v11/Command.md' if multiple versions exist.")]string fileName)
     {
       logger.LogInformation("[CslaCodeTool.Fetch] Called with fileName: '{FileName}'", fileName);
       

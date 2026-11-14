@@ -583,6 +583,94 @@ When `UseInMemoryApplicationContextManager = true`:
 - No state synchronization with WebAssembly clients
 - Simpler but only works for server-only scenarios
 
+### Custom Session Store (CSLA 10.1+)
+
+> **Applies to CSLA 10.1 and later.** In earlier versions the server-side `SessionManager` kept sessions in a hard-coded in-memory dictionary.
+
+When `UseInMemoryApplicationContextManager = false`, the server-side `SessionManager` (`Csla.Blazor.State.SessionManager` in `Csla.AspNetCore`) reads and writes sessions through an `ISessionStore` service. The default store is `InMemorySessionStore`, which keeps sessions in a `ConcurrentDictionary` in server memory. That keeps the old behavior, and it's fine for a single server. You don't need to change any configuration unless you want a different store.
+
+In CSLA 11, the `Csla.Blazor.State.AzureTableStorage` package provides a ready-made store that keeps sessions in Azure Table Storage, registered with `UseAzureTableStorageSessionStore`. See `v11/AzureTableStorageSessionStore.md`.
+
+To share sessions across load-balanced servers, or to keep them through a restart, implement `Csla.State.ISessionStore` and register it with `SessionStoreType`:
+
+```csharp
+namespace Csla.State;
+
+public interface ISessionStore
+{
+    ValueTask<Session?> GetSessionAsync(string key);
+    ValueTask AddOrUpdateSessionAsync(string key, Session session);
+    ValueTask PurgeExpiredSessionsAsync(TimeSpan expiration);
+}
+```
+
+```csharp
+builder.Services.AddCsla(options => options
+    .AddAspNetCore()
+    .AddServerSideBlazor(blazor =>
+    {
+        blazor.UseInMemoryApplicationContextManager = false;
+        blazor.SessionStoreType = typeof(MyDistributedSessionStore);
+    })
+    .DataPortal(dp => dp
+        .AddServerSideDataPortal()));
+```
+
+`BlazorServerConfigurationOptions` has these session-related properties:
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `SessionStoreType` | `Csla.Blazor.State.InMemorySessionStore` | `ISessionStore` implementation (registered as a **singleton**) |
+| `SessionManagerType` | `Csla.Blazor.State.SessionManager` | `ISessionManager` implementation (singleton) |
+| `SessionIdManagerType` | `Csla.Blazor.State.SessionIdManager` | `ISessionIdManager` implementation (transient) |
+
+These types are registered only when `UseInMemoryApplicationContextManager = false`. When it's `true`, CSLA uses a no-op session manager and doesn't use `ISessionStore`.
+
+Implementation rules for a custom store:
+
+- `GetSessionAsync` returns `null` when there's no session for the key. `SessionManager` then creates a new, empty `Session` and stores it with `AddOrUpdateSessionAsync`.
+- `AddOrUpdateSessionAsync` inserts or replaces the session for the key.
+- `PurgeExpiredSessionsAsync(expiration)` removes sessions whose `Session.LastTouched` (Unix time in seconds, UTC) is older than `expiration`.
+- The store is a **singleton**, so it must be thread-safe, and it can depend only on singleton services. It can't take scoped services such as `ApplicationContext`.
+- `Session` is a `MobileDictionary<string, object?>`. It holds the user's principal and the `LocalContext`/`ClientContext` dictionaries. A distributed store has to serialize it, together with the principal and every value your app puts into those contexts.
+- `SessionManager` calls the store synchronously: if a `ValueTask` isn't already complete, it blocks on it. Keep store operations fast, and avoid code that needs a synchronization context.
+- The server-side context manager changes the `Session` instance that `GetSessionAsync` returned in place, for example when `LocalContext` or `ClientContext` is set. It doesn't call `AddOrUpdateSessionAsync` for those changes. `AddOrUpdateSessionAsync` runs when a session is first created and when a WebAssembly client sends its state back through `CslaStateController`. A store that returns a new copy on every read (such as one that deserializes from Redis each time) won't keep in-place changes unless it handles that itself, for example by keeping the live instances in a local cache and writing them through.
+
+### Purging Expired Sessions (CSLA 11+)
+
+> **Applies to CSLA 11 and later.** In earlier versions the app has to call `ISessionManager.PurgeSessions(expiration)` on its own schedule, and sessions are never removed otherwise.
+
+When `UseInMemoryApplicationContextManager = false`, `AddServerSideBlazor` registers a hosted background service that calls `ISessionManager.PurgeSessions` periodically. It's on by default. Configure it on the same options:
+
+```csharp
+builder.Services.AddCsla(options => options
+    .AddAspNetCore()
+    .AddServerSideBlazor(blazor =>
+    {
+        blazor.UseInMemoryApplicationContextManager = false;
+        blazor.SessionPurgeInterval = TimeSpan.FromMinutes(5);
+        blazor.SessionExpiration = TimeSpan.FromHours(1);
+    }));
+```
+
+| `BlazorServerConfigurationOptions` property | Default | Purpose |
+| --- | --- | --- |
+| `PurgeExpiredSessions` | `true` | Runs the purging service. Set it to `false` to turn it off. |
+| `SessionPurgeInterval` | 5 minutes | How often the service calls `PurgeSessions` |
+| `SessionExpiration` | 1 hour | How long a session can go untouched before it's removed |
+
+How the service behaves:
+
+- It's registered only when `UseInMemoryApplicationContextManager = false`. With the default (`true`) there are no stored sessions to purge.
+- Sessions that haven't been touched for `SessionExpiration` are removed. If users can be idle longer and should keep their session, raise it.
+- The first purge runs one `SessionPurgeInterval` after the app starts. The interval must be from 1 millisecond to 4,294,967,294 milliseconds (about 49.7 days), the range `PeriodicTimer` supports, and `SessionExpiration` must be greater than zero. Otherwise `AddServerSideBlazor` throws `ArgumentOutOfRangeException`.
+- It calls `ISessionManager.PurgeSessions`, so it works with every `ISessionStore` and with a custom `SessionManagerType`.
+- A failed purge is logged as a warning, and the next purge runs on schedule. One failure doesn't stop the service or the app.
+- If a custom session manager doesn't support purging (it throws `NotSupportedException` or `NotImplementedException`), the service logs a warning and stops.
+- A shared store refreshes the stored last-touched time of live sessions on each purge, so other servers don't remove them. Keep `SessionPurgeInterval` well below `SessionExpiration`, and leave purging on for every server.
+- If the app purges sessions itself, set `PurgeExpiredSessions = false`, or remove its own schedule. Running both is harmless, but the shorter expiration wins.
+- To read the values from configuration, set them in the delegate, for example `blazor.SessionExpiration = builder.Configuration.GetValue("Csla:SessionExpiration", TimeSpan.FromHours(1))`.
+
 ### Using StateManager in Blazor Pages
 
 In your Blazor pages (especially those that may run in WebAssembly), inject and use `StateManager`:

@@ -129,6 +129,19 @@ graph TD
     C -->|No| E
 ```
 
+Values that the attribute doesn't specify (isolation level, timeout, async flow option) come from `CslaOptions.DataOptions` (`DefaultTransactionIsolationLevel`, `DefaultTransactionTimeoutInSeconds`, `DefaultTransactionAsyncFlowOption`). The default async flow option is `TransactionScopeAsyncFlowOption.Suppress`, so for an `async` data portal method that awaits inside the transaction, specify `TransactionScopeAsyncFlowOption.Enabled` on the attribute or set it as the default:
+
+```csharp
+[Update]
+[Transactional(TransactionalTypes.TransactionScope, TransactionIsolationLevel.ReadCommitted, TransactionScopeAsyncFlowOption.Enabled)]
+private async Task Update([Inject] IMyDataAccess dal)
+{
+    await dal.UpdateDataAsync(/* ... */);
+}
+```
+
+> **CSLA 11:** `TransactionalAttribute` no longer copies the `DataOptions` defaults when it is constructed. Unspecified values are resolved when the transaction is created, so configuration changes are always honored. `TimeoutInSeconds` is now `int?` and `AsyncFlowOption` is now `TransactionScopeAsyncFlowOption?`; both are `null` when the attribute doesn't set them. The `DataOptions` defaults are per `CslaOptions` instance instead of static. The server-side data portal creates the `TransactionScope` through an `ITransactionScopeFactory` service (default `DefaultTransactionScopeFactory`), which you can replace with `AddServerSideDataPortal(cfg => cfg.RegisterTransactionScopeFactory<MyFactory>())` to adjust the transaction per operation. See `v11/TransactionScopeFactory.md`.
+
 ## 3. Data Portal Operations
 
 The data portal standardizes on a set of five operations. You implement methods in your business object (or an object factory) decorated with attributes corresponding to these operations.
@@ -141,6 +154,8 @@ The data portal standardizes on a set of five operations. You implement methods 
 | **Delete** | `[Delete]` | Immediately deletes a business object's data from the database based on criteria. |
 | **Execute** | `[Execute]` | Runs a command or process on the server. Used for operations that don't fit the standard CRUD model. |
 
+> **CSLA 11:** The data portal only invokes methods that have an operation attribute. Older versions also found methods by name (`DataPortal_Fetch`, `Child_Update`, and so on) when no attribute was present, controlled by `DataPortalOptions.UseLegacyOperationMethods`. In CSLA 11 that fallback and the option are removed, so a legacy-named method without an attribute is never called (analyzer CSLA0014 is now a warning and its code fix adds the attribute). The CSLA source generators are bundled in the `Csla` package: declare classes that have operation methods `partial` (analyzer CSLA0024) and the generator emits code that calls them directly instead of through reflection; non-partial classes still work through reflection. You can also add `[DataPortalExtensions]` to a class to generate strongly typed `IDataPortal<T>` / `IChildDataPortal<T>` extension methods for its operations. See `v11/UpgradingToCsla11.md`, `v11/DataPortalOperationDispatch.md`, and `v11/DataPortalExtensions.md`.
+
 ### Example: The Fetch Operation
 
 1.  **Client Code:** The client calls `FetchAsync`, passing criteria to identify the object.
@@ -149,7 +164,8 @@ The data portal standardizes on a set of five operations. You implement methods 
     ```
 2.  **Server-Side Implementation:** The data portal invokes the method marked with `[Fetch]` in your business class.
     ```csharp
-    public class CustomerEdit : BusinessBase<CustomerEdit>    {
+    public partial class CustomerEdit : BusinessBase<CustomerEdit>
+    {
         // ... properties
 
         [Fetch]
@@ -191,9 +207,12 @@ public class CustomerEdit : BusinessBase<CustomerEdit>
 You then create a factory class that contains the data access methods:
 
 ```csharp
-public class CustomerFactory : ObjectFactory
+public class CustomerFactory(ApplicationContext applicationContext, ICustomerDal dal)
+    : ObjectFactory(applicationContext)
 {
-    public CustomerEdit Fetch(int id, [Inject] ICustomerDal dal)
+    // The factory is created through DI, so services can be constructor-injected.
+    // CSLA 10.2+ also supports [Inject] parameters on factory methods.
+    public CustomerEdit Fetch(int id)
     {
         var customer = (CustomerEdit)ApplicationContext.CreateInstanceDI(typeof(CustomerEdit));
         var data = dal.Fetch(id);
@@ -216,6 +235,8 @@ public class CustomerFactory : ObjectFactory
 *   The factory needs to manipulate the internal state of the business object, which can feel like it breaks encapsulation (`BypassPropertyChecks`, `MarkOld`).
 *   It introduces another class to maintain for each business object.
 
+See `ObjectFactory.md` for complete details on the factory model.
+
 The **recommended approach** for most scenarios is the default "encapsulated invocation" model, where the data portal calls methods on the business object itself. This preserves encapsulation while still allowing for clean separation by having the business object method immediately delegate the call to a separate Data Access Layer (DAL) component, which is injected into the method.
 
 ## 5. Differentiating Root and Child Data Portal Operations
@@ -236,6 +257,8 @@ Here are the attributes for child data portal operations:
 | **Fetch Child** | `[FetchChild]` | Retrieves data for a child object, typically called from the parent's `[Fetch]` method. |
 | **Update Child** | `[InsertChild]`, `[UpdateChild]`, `[DeleteSelfChild]` | Persists changes to a child object. This is called from the parent's `[Update]` method. The data portal automatically calls the correct method on the child based on its state. |
 
+> **CSLA 11:** Child operations also require the attribute; a `Child_Fetch` or `Child_Update` method without `[FetchChild]`/`[UpdateChild]` is never called. `BusinessBase`, `BusinessListBase`, and `BusinessBindingListBase` have a `protected virtual Child_Create()` marked `[CreateChild]`, which runs when you create a child with no criteria and the class has no better matching `[CreateChild]` method (the `BusinessBase` version checks business rules). For list classes, the data portal calls `Child_UpdateAsync` (marked `[UpdateChild]`); the synchronous `Child_Update()` helper has no attribute and is only for calling from your own `[Update]`/`[Insert]`/`[DeleteSelf]` methods.
+
 ### Typical Workflow: Root Operation Triggering Child Operations
 
 Consider fetching a root `Order` object that contains a child collection of `LineItem` objects.
@@ -249,7 +272,7 @@ Consider fetching a root `Order` object that contains a child collection of `Lin
     ```csharp
     // Inside the Order class
     [Fetch]
-    private void Fetch(int orderId, [Inject] IChildDataPortal<LineItems> childPortal)
+    private void Fetch(int orderId, [Inject] IOrderDal dal, [Inject] IChildDataPortal<LineItems> childPortal)
     {
         // 1. Fetch parent's own data
         var orderData = dal.GetOrder(orderId);

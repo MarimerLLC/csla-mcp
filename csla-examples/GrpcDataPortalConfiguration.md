@@ -21,6 +21,8 @@ The gRPC channel requires the `Csla.Channels.Grpc` NuGet package:
 <PackageReference Include="Csla.Channels.Grpc" Version="9.0.0" />
 ```
 
+Use the same version as your `Csla` package (for example `10.x` with CSLA 10 or `11.x` with CSLA 11).
+
 For the server, you also need the standard ASP.NET Core gRPC package:
 
 ```xml

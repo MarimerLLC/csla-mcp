@@ -72,8 +72,8 @@ namespace MyApp.Business
             
             // Property-level authorization rule
             BusinessRules.AddRule(
-                new Rules.CommonRules.IsInRole(
-                    Rules.AuthorizationActions.WriteProperty, 
+                new Csla.Rules.CommonRules.IsInRole(
+                    Csla.Rules.AuthorizationActions.WriteProperty, 
                     PriceProperty, 
                     "Manager", "Admin"));
         }
@@ -282,15 +282,3 @@ Children support full business rules including:
 * Calculated properties
 
 Rules are checked independently but contribute to parent's validation state.
-            Price = ReadProperty(PriceProperty)
-        };
-        dal.Update(data);
-    }
-
-    [DeleteSelfChild]
-    private void DeleteSelfChild([Inject] IOrderDetailDal dal)
-    {
-        dal.Delete(ReadProperty(IdProperty));
-    }
-}
-```
