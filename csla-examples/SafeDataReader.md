@@ -227,7 +227,7 @@ public class PersonDal
 
 ### Async Methods
 
-`SafeSqlDataReader` provides async versions of common operations:
+In CSLA 10, only `SafeSqlDataReader` has async members (`SafeDataReader` has none):
 
 ```csharp
 // Async navigation
@@ -236,7 +236,7 @@ bool hasData = await safeReader.ReadAsync(cancellationToken);
 bool hasMoreResults = await safeReader.NextResultAsync();
 bool hasMoreResults = await safeReader.NextResultAsync(cancellationToken);
 
-// Async null checking
+// Async null checking (CSLA 10 name; obsolete in CSLA 11, use IsDBNullAsync)
 bool isNull = await safeReader.IsDbNullAsync(ordinal);
 bool isNull = await safeReader.IsDbNullAsync(ordinal, cancellationToken);
 
@@ -245,7 +245,34 @@ int age = await safeReader.GetFieldValueAsync<int>(ordinal);
 string name = await safeReader.GetFieldValueAsync<string>(ordinal, cancellationToken);
 ```
 
+> **CSLA 11:** The async members are on `SafeDataReader` itself, so they work with any ADO.NET provider (they use the wrapped `DbDataReader`; a reader that isn't a `DbDataReader` runs them synchronously). `SafeSqlDataReader` inherits them and no longer throws `NotSupportedException` for a non-`SqlDataReader`. Use `IsDBNullAsync`; `IsDbNullAsync` is obsolete (CS0618). Recompile code built against CSLA 10. Available members:
+>
+> - `ReadAsync`, `NextResultAsync`, `CloseAsync`
+> - `IsDBNullAsync` and `GetFieldValueAsync<T>`, by ordinal or column name
+> - Null-safe getters with the same defaults as the sync getters, by ordinal or column name: `GetStringAsync`, `GetInt32Async`, `GetInt16Async`, `GetInt64Async`, `GetDecimalAsync`, `GetDoubleAsync`, `GetFloatAsync`, `GetBooleanAsync`, `GetByteAsync`, `GetGuidAsync`, `GetDateTimeAsync`, `GetDateTimeOffsetAsync`, `GetSmartDateAsync`, `GetValueAsync`
+> - `DisposeAsync` (`SafeDataReader` implements `IAsyncDisposable`), so use `await using`
+>
+> ```csharp
+> await using var cm = connection.CreateCommand();
+> cm.CommandText = "SELECT Id, Name, Age FROM Person WHERE Id = @Id";
+> var idParameter = cm.CreateParameter();   // provider-neutral (AddWithValue is SqlClient-only)
+> idParameter.ParameterName = "@Id";
+> idParameter.Value = id;
+> cm.Parameters.Add(idParameter);
+>
+> await using var dr = new SafeDataReader(await cm.ExecuteReaderAsync(ct));
+> if (await dr.ReadAsync(ct))
+> {
+>     var personId = await dr.GetInt32Async("Id", ct);
+>     var name = await dr.GetStringAsync("Name", ct);   // "" for NULL
+>     var age = await dr.GetInt32Async("Age", ct);      // 0 for NULL
+> }
+> ```
+
 ### When to Use SafeSqlDataReader vs SafeDataReader
+
+In CSLA 11, use `SafeDataReader` for async code with any provider; the guidance below is for CSLA 10.
+
 
 Use `SafeSqlDataReader` when:
 - Working specifically with SQL Server databases
@@ -268,7 +295,7 @@ using System;
 using System.Data.SqlClient;
 
 [Serializable]
-public class Person : BusinessBase<Person>
+public partial class Person : BusinessBase<Person>
 {
   public static readonly PropertyInfo<int> IdProperty = RegisterProperty<int>(c => c.Id);
   public int Id

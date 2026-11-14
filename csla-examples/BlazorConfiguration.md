@@ -636,6 +636,10 @@ Implementation rules for a custom store:
 - `SessionManager` calls the store synchronously: if a `ValueTask` isn't already complete, it blocks on it. Keep store operations fast, and avoid code that needs a synchronization context.
 - The server-side context manager changes the `Session` instance that `GetSessionAsync` returned in place, for example when `LocalContext` or `ClientContext` is set. It doesn't call `AddOrUpdateSessionAsync` for those changes. `AddOrUpdateSessionAsync` runs when a session is first created and when a WebAssembly client sends its state back through `CslaStateController`. A store that returns a new copy on every read (such as one that deserializes from Redis each time) won't keep in-place changes unless it handles that itself, for example by keeping the live instances in a local cache and writing them through.
 
+**Business objects kept in session state:** a business object stored in the `Session`, `LocalContext` or `ClientContext` holds the `ApplicationContext` (and DI scope) of the request or circuit that created it. In CSLA 10, using it after that scope is gone (for example calling `SaveAsync()` from a later circuit) throws `ObjectDisposedException` or runs in the old scope. In CSLA 10, store criteria or IDs and re-fetch, rather than storing business objects.
+
+> **CSLA 11:** Business objects restored from session state (directly in `Session`, or inside `LocalContext`/`ClientContext`) are re-attached to the caller's `ApplicationContext` when their original scope is gone, so `SaveAsync()` and data portal calls run in the caller's scope instead of throwing `ObjectDisposedException`.
+
 ### Purging Expired Sessions (CSLA 11+)
 
 > **Applies to CSLA 11 and later.** In earlier versions the app has to call `ISessionManager.PurgeSessions(expiration)` on its own schedule, and sessions are never removed otherwise.

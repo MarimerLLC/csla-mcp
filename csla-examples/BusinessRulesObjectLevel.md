@@ -250,6 +250,10 @@ public static void AddObjectAuthorizationRules(IAddObjectAuthorizationRulesConte
 }
 ```
 
+**Async object authorization rules** (`AuthorizationRuleAsync` / `IAuthorizationRuleAsync`): evaluate them with `await BusinessRules.HasPermissionAsync(applicationContext, AuthorizationActions.CreateObject, typeof(Order), ct)` (the `CancellationToken` is required; pass `CancellationToken.None` if you have none). In CSLA 10 the synchronous checks (`BusinessRules.HasPermission`, `IsSavable`, view model `Can*Object` properties) throw `ArgumentOutOfRangeException` for an async rule, so use sync rules for per-type permissions there.
+
+> **CSLA 11:** Async per-type rules work in `IsSavable` and in the XAML and Blazor view models. `BusinessRules.HasPermission` runs an async rule whose task completes synchronously, and throws `InvalidOperationException` (use `HasPermissionAsync`) if it is still running. Reading `IsSavable` while an async `CreateObject`/`EditObject`/`DeleteObject` rule runs marks the object busy and returns `false`; `await obj.WaitForIdle()` before reading it again or saving (saving while busy throws). View model permission properties (`CanCreateObject`, `CanEditObject`, ...) start `false` and raise `PropertyChanged` when the rule completes. See `BusinessRulesAuthorization.md`.
+
 ### State-Based Object Authorization
 
 Authorization based on object state and user identity:

@@ -268,7 +268,7 @@ namespace MyApp.Business
             {
                 var quantity = (int)context.InputPropertyValues[_quantityProperty];
                 var price = (decimal)context.InputPropertyValues[_priceProperty];
-                context.AddOutValue(PrimaryProperty, quantity * price);
+                context.AddOutValue(PrimaryProperty!, quantity * price);
             }
         }
     }

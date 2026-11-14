@@ -202,6 +202,26 @@ This model binder:
 - Supports validation integration with ASP.NET Core model state
 - Works with both MVC controllers and Razor Page handlers
 
+`AddAspNetCore()` already inserts `CslaModelBinderProvider` at position 0 (through `AddMvcCore`), so the explicit `Insert` above is optional.
+
+> **CSLA 11:** `CslaModelBinder` binds the whole editable object graph: root properties, editable child objects and editable child lists at any depth (`Address.Street`, `Children[0].GrandChildren[1].Name`), using the field names the tag helpers generate in `for` loops. `TryUpdateModelAsync(model)` binds **into the object you pass** (only posted values are set; other properties and children are untouched). The binder honors `[BindNever]`, `[Bind]` and the `TryUpdateModelAsync` include list, waits for async rules in the graph, no longer sets unposted child properties to `null`, and binds a non-form request to a new object instead of throwing. An action parameter is bound to a **new** graph (`IsNew == true`, saves as an insert), so for edits fetch the object and bind into it:
+>
+> ```csharp
+> [HttpPost]
+> public async Task<IActionResult> Edit(int id)
+> {
+>     var person = await _personPortal.FetchAsync(id);
+>     if (await TryUpdateModelAsync(person) && person.IsSavable)
+>     {
+>         person = await person.SaveAsync();
+>         return RedirectToAction("Index");
+>     }
+>     return View(person);
+> }
+> ```
+>
+> Posting a list never removes items (remove them in the controller), lists with `AllowNew == false` ignore posted items past their existing ones, and new children are created with the declared type (polymorphic children bind only when they already exist). See `v11/AspNetCoreModelBinding.md`.
+
 ### HttpContextAccessor
 
 CSLA requires access to the HTTP context for proper context management:

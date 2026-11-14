@@ -60,7 +60,7 @@ services.AddCsla(options => options
 
 // Business object using the criteria
 [Serializable]
-public class CustomerList : ReadOnlyListBase<CustomerList, CustomerInfo>
+public partial class CustomerList : ReadOnlyListBase<CustomerList, CustomerInfo>
 {
     [Fetch]
     private async Task Fetch(CustomerCriteria criteria, [Inject] ICustomerDal dal,
@@ -134,7 +134,7 @@ services.AddCsla(options => options
 
 ```csharp
 [Serializable]
-public class ProductList : ReadOnlyListBase<ProductList, ProductInfo>
+public partial class ProductList : ReadOnlyListBase<ProductList, ProductInfo>
 {
     [Fetch]
     private async Task Fetch(ProductSearch criteria, [Inject] IProductDal dal,
@@ -252,6 +252,39 @@ services.AddCsla(options => options
                 new TypeMap<MyComplexType, MyCustomSerializer>(
                     MyCustomSerializer.CanSerialize)))));
 ```
+
+In CSLA 10, analyzer CSLA0010 reports data portal operation arguments of these types as not serializable even when a serializer is registered, because it can't see runtime registration. Suppress it with a justification.
+
+> **CSLA 11:** Declare serializers with attributes, then register every declaration in an assembly with `AddCustomSerializers`. CSLA0010 reads the declarations and stops reporting those types.
+>
+> ```csharp
+> // Serializers.cs
+> using Csla.Serialization.Mobile;
+> using Csla.Serialization.Mobile.CustomSerializers;  // PocoSerializer<T>
+>
+> // a type and serializer you don't own; assembly attributes go before any type declaration (CS1730)
+> [assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
+>
+> [MobileSerializer(typeof(MyCustomSerializer))]             // on a type you own
+> public class MyComplexType { ... }
+>
+> [MobileSerializer(typeof(PocoSerializer<CustomerCriteria>))]
+> public class CustomerCriteria { ... }
+>
+> [MobileSerializerFor(typeof(ThirdParty.Models.ApiRequest))] // on a serializer, for types you don't own
+> public class ApiRequestSerializer : IMobileSerializer { ... }
+> ```
+>
+> ```csharp
+> // Program.cs (startup)
+> services.AddCsla(o => o
+>     .Serialization(s => s
+>         .UseMobileFormatter(m => m.AddCustomSerializers(typeof(MyComplexType).Assembly))));
+> ```
+>
+> - Pass **every** assembly that declares serializers to `AddCustomSerializers(params Assembly[])`. Assemblies aren't scanned automatically: an assembly you don't pass satisfies the analyzer but fails at run time. Register on every tier (client and server).
+> - Generic types can't be declared; keep `CustomSerializers.Add(new TypeMap<T, S>(...))` for them.
+> - Full rules (exact-type mapping, valid declarations and CSLA0028/CSLA0029, precedence, trimming) are in `v11/CustomSerializers.md`.
 
 ## SerializationInfo Supported Types
 

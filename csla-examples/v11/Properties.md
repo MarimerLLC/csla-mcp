@@ -179,7 +179,11 @@ BusinessRules.AddRule(new MaxLength(NameProperty, 50));
 
 ## Calculated Properties
 
-Calculated properties should NOT be partial. Implement them as standard properties.
+There are two kinds of calculated property. Pick by whether rules, data binding or other rules need the value as a managed property.
+
+### Computed on read (plain C# property)
+
+No backing field, not serialized, no rules, computed every time it's read. Don't make it `partial`.
 
 ```csharp
 [CslaImplementProperties]
@@ -187,24 +191,77 @@ public partial class OrderItem : BusinessBase<OrderItem>
 {
     public partial int Quantity { get; set; }
     public partial decimal Price { get; set; }
-    
-    // Calculated property - not partial
-    public decimal Total => Quantity * Price;
-    
-    // Calculated property with logic
-    public string Status
+
+    // Not partial: no PropertyInfo, no rules, no change tracking
+    public decimal LineTotal => Quantity * Price;
+}
+```
+
+Use this for simple display values. It raises no `PropertyChanged` of its own, so UI bound to it doesn't refresh when `Quantity` changes unless you raise it yourself.
+
+### Calculated by business rules (`[CalculatedProperty]`)
+
+Use a managed property marked `[CalculatedProperty]` (namespace `Csla`) when a business rule sets the value with `context.AddOutValue`, other rules use it as input, or the UI needs `PropertyChanged` for it. A calculated property:
+
+* is not serialized;
+* never marks the object dirty, whether set by a rule, `SetProperty` or `LoadProperty`;
+* is recalculated after deserialization (data portal round trip, `Clone()`), by rerunning the rules whose primary property is the calculated property.
+
+```csharp
+[CslaImplementProperties]
+public partial class Order : BusinessBase<Order>
+{
+    public partial decimal Subtotal { get; set; }
+    public partial decimal TaxRate { get; set; }
+
+    [CalculatedProperty]
+    public partial decimal Total { get; private set; }   // no setter, or a private setter (CSLA0026)
+
+    protected override void AddBusinessRules()
     {
-        get
-        {
-            if (Quantity <= 0) return "Invalid";
-            if (Quantity > 100) return "Bulk Order";
-            return "Standard";
-        }
+        base.AddBusinessRules();
+        BusinessRules.AddRule(new CalcTotal(TotalProperty, SubtotalProperty, TaxRateProperty));
+        BusinessRules.AddRule(new Dependency(SubtotalProperty, TotalProperty));
+        BusinessRules.AddRule(new Dependency(TaxRateProperty, TotalProperty));
     }
 }
 ```
 
-**Note**: Calculated properties are not serialized and are recalculated each time they're accessed.
+* Only in `BusinessBase` types (CSLA0027). Intended for simple values, not child objects or lists.
+* Don't call `MarkClean()` / `MarkOld()` after `CheckRules()` to undo dirtiness caused by calculated values; mark the property `[CalculatedProperty]` instead.
+
+See `CalculatedProperties.md` for the rule implementation and details.
+
+## Lazy-Loaded Properties
+
+Use `LazyGetPropertyAsync` (in `BusinessBase` and `ReadOnlyBase`) with a factory `Func<Task<P>>`. The factory only runs when the value isn't loaded and isn't already loading. The first read returns `null` and the value arrives later with `PropertyChanged`, so declare the property nullable. Lazy properties are hand-written (not `partial`).
+
+```csharp
+public static readonly PropertyInfo<ShipmentInfo> ShipmentProperty =
+    RegisterProperty<ShipmentInfo>(nameof(Shipment), RelationshipTypes.LazyLoad);
+
+public ShipmentInfo? Shipment =>
+    LazyGetPropertyAsync(ShipmentProperty,
+        () => ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
+```
+
+Wrong → right:
+
+```csharp
+// Wrong: passes a Task<P>. The task starts on every read (extra fetches), and the
+// Task<P> overloads are obsolete (CS0618).
+public ShipmentInfo? Shipment =>
+    LazyGetPropertyAsync(ShipmentProperty, portal.FetchChildAsync(Id));
+
+// Right: pass a factory
+public ShipmentInfo? Shipment =>
+    LazyGetPropertyAsync(ShipmentProperty, () => portal.FetchChildAsync(Id));
+```
+
+* No `FieldManager.FieldExists` / `PropertyIsLoading` guard is needed, and no CSLA0007 suppression.
+* Passing `null` as the second argument doesn't compile (`CS0121`, ambiguous between the two overloads).
+* If the factory throws, returns `null` or returns a failed task, the object raises `UnhandledAsyncException`, the getter returns the default value, and the next read calls the factory again.
+* `LazyReadPropertyAsync(property, factory)` is the same without the read authorization check.
 
 ## Property Access Patterns
 

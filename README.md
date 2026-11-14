@@ -265,6 +265,8 @@ When a `search` call doesn't pass a `version`, the server uses a configured defa
 - **Environment variable** `CSLA_DEFAULT_VERSION` (e.g., `10` or `v10`)
 - **Default**: `10`
 
+The default stays at `10` while CSLA 11 is in prerelease, and changes to `11` when CSLA 11.0.0 is released.
+
 An invalid value is ignored with a startup warning. If there is no matching `v<N>/` folder under the code samples path, the server logs a warning and version-less searches return only the common (root-level) files.
 
 ```bash

@@ -84,7 +84,7 @@ Services you register with `ConfigureServices` are applied **after** CSLA's own 
 using Csla;
 
 [Serializable]
-public class CustomerEdit : BusinessBase<CustomerEdit>
+public partial class CustomerEdit : BusinessBase<CustomerEdit>
 {
     public static readonly PropertyInfo<int> IdProperty = RegisterProperty<int>(nameof(Id));
     public int Id

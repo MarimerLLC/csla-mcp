@@ -150,7 +150,7 @@ namespace MyApp.Business
 
             protected override void Execute(Csla.Rules.IRuleContext context)
             {
-                var email = (string)context.InputPropertyValues[PrimaryProperty];
+                var email = (string?)context.InputPropertyValues[PrimaryProperty!];
 
                 if (!string.IsNullOrEmpty(email))
                 {

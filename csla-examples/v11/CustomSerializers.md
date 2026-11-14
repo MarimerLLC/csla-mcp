@@ -87,6 +87,50 @@ The `TypeMap` constructor takes:
 1. **Type parameters**: The target type and the serializer type
 2. **CanSerialize delegate**: A function that determines if this serializer handles a given type
 
+## Declaring Custom Serializers with Attributes
+
+In CSLA 11, prefer declaring the serializer with an attribute and registering the whole assembly. The CSLA analyzers read the declarations, so CSLA0010 stops reporting data portal operation arguments of those types as not serializable. `TypeMap` registration still works.
+
+```csharp
+using Csla.Serialization.Mobile;
+using Csla.Serialization.Mobile.CustomSerializers;
+
+// 3. Assembly level, when you own neither the type nor the serializer.
+//    Assembly attributes go after the usings and before any type declaration (CS1730).
+[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
+
+// 1. On a type you own
+[MobileSerializer(typeof(AddressInfoSerializer))]
+public class AddressInfo { /* ... */ }
+
+[MobileSerializer(typeof(PocoSerializer<CustomerDto>))]
+public class CustomerDto { /* ... */ }
+
+// 2. On a serializer, for types you don't own (one or more)
+[MobileSerializerFor(typeof(ExternalApi.Models.ApiResponse))]
+public class ApiResponseSerializer : IMobileSerializer { /* ... */ }
+```
+
+Register every declared serializer in an assembly at startup, on both client and server:
+
+```csharp
+services.AddCsla(o => o
+    .Serialization(s => s
+        .UseMobileFormatter(m => m.AddCustomSerializers(typeof(AddressInfo).Assembly))));
+```
+
+Rules:
+
+* **Pass every assembly that declares serializers to `AddCustomSerializers`.** Assemblies aren't scanned automatically. An assembly that isn't passed satisfies the analyzer but fails at run time when the type is serialized.
+* **Each declaration maps one exact type.** Derived types aren't covered: `[MobileSerializer]` on `Shape` doesn't cover `Circle`. Declare each concrete type (or list them all in one `[MobileSerializerFor(typeof(Shape), typeof(Circle), typeof(Rectangle))]`).
+* **Generic target types** can't be declared this way. Register them with `CustomSerializers.Add(new TypeMap<T, S>(...))`.
+* The serializer type must be a non-abstract class with a public constructor that implements `IMobileSerializer`; a closed generic type such as `PocoSerializer<CustomerDto>` is allowed.
+* **CSLA0028** reports an invalid declaration, which the generator skips (so the type isn't serializable at run time): a serializer that isn't a non-abstract class implementing `IMobileSerializer` with a public constructor, an open generic serializer, a target type that is generic, primitive, `string`/`DateTime`/`Guid` and similar, or an `IMobileObject` (CSLA types are serialized before custom serializers are consulted), or a private/protected nested type.
+* **CSLA0029** reports a type mapped to more than one serializer. Declare exactly one.
+* Serializers already in `CustomSerializers` take precedence. Calling `AddCustomSerializers` twice for the same assembly adds nothing.
+* `AddCustomSerializers` reads the generated `[assembly: MobileSerializerRegistration]` attributes without scanning types, so it is trim-safe. (`PocoSerializer<T>` itself uses reflection-based JSON and isn't.)
+* `ClaimsPrincipal` already has a declared serializer, so CSLA0010 doesn't report `ClaimsPrincipal` arguments.
+
 ## SerializationInfo Supported Types
 
 The `SerializationInfo` class can store these primitive types:
@@ -503,4 +547,4 @@ CSLA 11 includes these built-in custom serializers:
 
 7. **Prefer `PocoSerializer<T>` for simple types** - Only create custom serializers when you need special handling.
 
-8. **Register all types at startup** - Missing registrations will cause runtime errors when serialization is attempted.
+8. **Register all types at startup** - Missing registrations will cause runtime errors when serialization is attempted. With attribute declarations, pass each declaring assembly to `AddCustomSerializers`.

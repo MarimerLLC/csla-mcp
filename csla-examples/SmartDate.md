@@ -391,7 +391,7 @@ The most common pattern is using SmartDate as a backing field for a string prope
 
 ```csharp
 [Serializable]
-public class Customer : BusinessBase<Customer>
+public partial class Customer : BusinessBase<Customer>
 {
     public static readonly PropertyInfo<SmartDate> BirthDateProperty = 
         RegisterProperty<SmartDate>(c => c.BirthDate, null, new SmartDate());
