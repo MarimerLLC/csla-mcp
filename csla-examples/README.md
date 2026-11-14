@@ -99,6 +99,7 @@ External Links:
 **Version-specific documents include:**
 
 - `Properties.md` - Property declaration patterns (major differences between versions)
+- `NullableProperties.md` (v10, v11) - Nullable reference types with property getters: CS8603, when to use `!` and when to declare a property nullable, lazy-loaded properties
 - `EditableRoot.md`, `EditableChild.md`, etc. - Complete stereotype implementations
 - `EditableDocument.md` - Editable document (properties + embedded child collection) pattern
 - `Command.md` - Command object patterns
@@ -184,7 +185,7 @@ Some concepts appear in multiple documents at different levels of detail:
 | Data Portal Operations | `Glossary.md` | `DataPortalGuide.md`, `DataPortalOperation*.md` |
 | Data Access Models | `Glossary.md` | `SolutionArchitecture.md`, `DataPortalGuide.md`, `Data-Access.md` |
 | Business Rules | `Glossary.md` | `BusinessRules*.md` |
-| Properties | `Glossary.md` | `v11/Properties.md`, `v10/Properties.md`, `v9/Properties.md` |
+| Properties | `Glossary.md` | `v11/Properties.md`, `v10/Properties.md`, `v9/Properties.md`, `v11/NullableProperties.md`, `v10/NullableProperties.md` |
 
 This intentional overlap allows:
 
