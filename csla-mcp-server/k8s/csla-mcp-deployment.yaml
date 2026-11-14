@@ -28,6 +28,9 @@ spec:
             # Override URLs to listen on HTTP port 8080 inside the container
             - name: ASPNETCORE_URLS
               value: "http://+:8080"
+            # CSLA version used when a search doesn't specify one
+            - name: CSLA_DEFAULT_VERSION
+              value: "10"
           resources:
             requests:
               cpu: "100m"

@@ -258,6 +258,20 @@ dotnet run --project csla-mcp-server -- run
 dotnet run --project csla-mcp-server -- run
 ```
 
+### Configuring the Default CSLA Version
+
+When a `search` call doesn't pass a `version`, the server uses a configured default CSLA version rather than the highest version folder present. This lets a newer version folder (for example `v11/`) ship alongside the current one: callers that want it pass `version: 11` explicitly, while callers that omit the version keep getting the default.
+
+- **Environment variable** `CSLA_DEFAULT_VERSION` (e.g., `10` or `v10`)
+- **Default**: `10`
+
+An invalid value is ignored with a startup warning. If there is no matching `v<N>/` folder under the code samples path, the server logs a warning and version-less searches return only the common (root-level) files.
+
+```bash
+export CSLA_DEFAULT_VERSION=11
+dotnet run --project csla-mcp-server -- run
+```
+
 ### Embeddings File Location
 
 The server loads pre-generated embeddings from `embeddings.json` in the application's base directory. In a containerized deployment, this file should be mounted via a volume (see Docker examples above). When running locally with `dotnet run`, place the file in the same directory as the server executable or in the project directory.
@@ -296,7 +310,7 @@ Description: Extracts significant words from the provided input text and searche
 Parameters:
 
 - `message` (string, required): Natural language text or keywords to search for. Words of length 4 or less are ignored by the tool. The tool also searches for 2-word combinations from adjacent words to find phrase matches (e.g., "create operation" and "operation method" from "create operation method").
-- `version` (integer, optional): CSLA version number to filter results (e.g., `9` or `10`). If not provided, defaults to the highest version available by scanning version subdirectories in the examples folder (e.g., `v9/`, `v10/`). Files in the root directory (common to all versions) are included regardless of the specified version.
+- `version` (integer, optional): CSLA version number to filter results (e.g., `9` or `10`). If not provided, defaults to the server's configured default version (`CSLA_DEFAULT_VERSION`, currently `10`; see [Configuring the Default CSLA Version](#configuring-the-default-csla-version)). Files in the root directory (common to all versions) are included regardless of the specified version.
 
 Output: JSON array of objects with the shape:
 
@@ -320,7 +334,7 @@ Example call (MCP `tools/call`):
 }
 ```
 
-Example call without version (uses highest available):
+Example call without version (uses the configured default version):
 
 ```json
 {

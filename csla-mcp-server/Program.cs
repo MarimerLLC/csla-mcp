@@ -96,6 +96,28 @@ public sealed class RunCommand : Command<AppSettings>
         // Final logging of the resolved path
         Console.WriteLine($"[Startup] Final CodeSamplesPath: {CslaCodeTool.CodeSamplesPath}");
         Console.WriteLine($"[Startup] CodeSamplesPath exists: {Directory.Exists(CslaCodeTool.CodeSamplesPath)}");
+
+        // Default CSLA version used when a caller doesn't specify one
+        var defaultVersionEnv = Environment.GetEnvironmentVariable("CSLA_DEFAULT_VERSION");
+        if (!string.IsNullOrWhiteSpace(defaultVersionEnv))
+        {
+            var trimmed = defaultVersionEnv.Trim().TrimStart('v', 'V');
+            if (int.TryParse(trimmed, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var parsedVersion)
+                && parsedVersion > 0)
+            {
+                CslaCodeTool.DefaultVersion = parsedVersion;
+            }
+            else
+            {
+                Console.WriteLine($"[Startup] Warning: CSLA_DEFAULT_VERSION '{defaultVersionEnv}' is not a positive whole number; using default {CslaCodeTool.BuiltInDefaultVersion}.");
+            }
+        }
+        Console.WriteLine($"[Startup] Default CSLA version: {CslaCodeTool.DefaultVersion}");
+        var defaultVersionPath = Path.Combine(CslaCodeTool.CodeSamplesPath, $"v{CslaCodeTool.DefaultVersion}");
+        if (Directory.Exists(CslaCodeTool.CodeSamplesPath) && !Directory.Exists(defaultVersionPath))
+        {
+            Console.WriteLine($"[Startup] Warning: no v{CslaCodeTool.DefaultVersion} folder under CodeSamplesPath; searches without a version will only return common files.");
+        }
         
         if (Directory.Exists(CslaCodeTool.CodeSamplesPath))
         {
