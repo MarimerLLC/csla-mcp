@@ -237,6 +237,42 @@ public class PersonEditViewModel
 }
 ```
 
+### ViewModel Deriving from ViewModelBase&lt;T&gt;
+
+`Csla.Xaml.ViewModelBase<T>` manages `Model`, busy state, the `Can*` properties and (with `ManageObjectLifetime = true`, the WPF default) n-level undo:
+
+```csharp
+using Csla;
+using Csla.Xaml;
+
+public class PersonEditViewModel : ViewModelBase<PersonEdit>
+{
+  private readonly IDataPortal<PersonEdit> _portal;
+
+  public PersonEditViewModel(IDataPortal<PersonEdit> portal)
+  {
+    _portal = portal;
+  }
+
+  // CSLA 10: RefreshAsync<PersonEdit>(...); CSLA 11: RefreshAsync(...)
+  public Task LoadAsync(int id) =>
+    RefreshAsync<PersonEdit>(async () => await _portal.FetchAsync(id));
+}
+```
+
+In CSLA 10, `SaveAsync()` and `RefreshAsync()` throw when the operation fails, so wrap them in `try`/`catch`.
+
+> **CSLA 11:** `ViewModelBase<T>` delegates to the common `Csla.Mvvm.ViewModel<T>` (on WPF it is still a `DependencyObject`). `SaveAsync()` and `RefreshAsync()` **no longer throw**: they set `Exception` and `ViewModelErrorText` and raise the `Error` event (a failed `RefreshAsync` sets `Model` to `null`). An invalid `Model` is not saved and sets only `ViewModelErrorText`. Replace `try`/`catch` around them with a check of both properties:
+>
+> ```csharp
+> await vm.SaveAsync();
+> if (vm.Exception is null && string.IsNullOrEmpty(vm.ViewModelErrorText))
+>   await NavigateBack();
+> else
+>   ShowError(vm.ViewModelErrorText);
+> ```
+>
+> `RefreshAsync<F>(factory)` is obsolete (CS0618); call `RefreshAsync(factory)`. `SaveAsync()` returns `Task<T?>` and waits up to `BusyTimeout` (30 seconds) for a busy `Model`; use `SaveAsync(CancellationToken)` to control the wait. New events: `Saved`, `ModelChanging`, `ModelChanged`. On WPF, override `OnModelChanging` instead of `OnModelChanged` to run code before event handlers move to the new model. See `v11/ViewModels.md`.
 
 ## Multi-Tier Configuration
 

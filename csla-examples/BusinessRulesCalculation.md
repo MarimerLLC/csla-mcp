@@ -457,6 +457,20 @@ public class CalcShipping : BusinessRule
 }
 ```
 
+## Calculated Values and IsDirty
+
+A value set with `context.AddOutValue()` marks the object dirty when it changes the property. So `BusinessRules.CheckRules()` at the end of a `[Fetch]` or `[Create]` can leave a freshly loaded object with `IsDirty == true` because calculated values were filled in. In CSLA 10 the workaround is to call `MarkOld()` (fetch) or `MarkClean()` after `CheckRules()`.
+
+> **CSLA 11:** Mark the calculated property with `[CalculatedProperty]` instead of calling `MarkOld()`/`MarkClean()` after `CheckRules()`. A calculated property never changes `IsSelfDirty`/`IsDirty` (from a rule, `SetProperty` or `LoadProperty`), is not serialized, and is recalculated after deserialization by running the rules whose primary property it is. `PropertyChanged` and dependent rules still run. Give it no setter or a `private` setter (CSLA0026) and use it only in `BusinessBase` types (CSLA0027). Use it for simple values, not child objects or collections.
+>
+> ```csharp
+> public static readonly PropertyInfo<decimal> TotalProperty = RegisterProperty<decimal>(nameof(Total));
+> [CalculatedProperty]
+> public decimal Total => GetProperty(TotalProperty);
+> ```
+>
+> See `v11/CalculatedProperties.md`.
+
 ## Best Practices
 
 1. **Use AddOutValue** - Always use `context.AddOutValue()` to modify properties, never call `SetProperty()` in a rule

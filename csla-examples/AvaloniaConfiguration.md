@@ -174,7 +174,9 @@ Commonly used members:
 | `IsBusy`, `IsDirty`, `IsValid` | Model state |
 | `CanSave`, `CanCancel`, `CanCreate`, `CanDelete`, `CanFetch`, `CanAddNew`, `CanRemove` | Computed from model state and authorization rules |
 | `CanCreateObject`, `CanGetObject`, `CanEditObject`, `CanDeleteObject` | Per-type authorization |
-| `ManageObjectLifetime` | When `true`, the view model clones before saving and manages n-level undo |
+| `ManageObjectLifetime` | When `true`, the view model clones before saving and manages n-level undo (default `false` in CSLA 10, `true` in CSLA 11) |
+
+> **CSLA 11:** `ViewModelBase<T>` inherits the common `Csla.Mvvm.ViewModel<T>`. `ManageObjectLifetime` defaults to `true` and the public `ManageObjectLifetimeProperty` field is removed. `SaveAsync()` and `RefreshAsync()` no longer throw: they set `Exception`/`ViewModelErrorText` and raise `Error` (in CSLA 10 they throw). After `await ViewModel.SaveAsync()`, check `ViewModel.Exception is null && string.IsNullOrEmpty(ViewModel.ViewModelErrorText)` before continuing. `RefreshAsync<F>(factory)` is obsolete (CS0618); call `ViewModel.RefreshAsync(async () => await _portal.CreateAsync())`. See `v11/ViewModels.md`.
 
 ### Loading and Saving From a View
 

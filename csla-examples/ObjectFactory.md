@@ -457,7 +457,7 @@ So in CSLA 11, put child initialization for factory-based types in a `[CreateChi
 ```csharp
 [Serializable]
 [ObjectFactory(typeof(LineItemFactory))]
-public class LineItem : BusinessBase<LineItem>
+public partial class LineItem : BusinessBase<LineItem>
 {
     public static readonly PropertyInfo<int> QuantityProperty = RegisterProperty<int>(nameof(Quantity));
     public int Quantity

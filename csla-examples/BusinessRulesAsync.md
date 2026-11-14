@@ -311,31 +311,33 @@ public abstract class AsyncLookupRule : BusinessRule
 
 ## Async Rules and Priority
 
-Async rules support priorities just like synchronous rules, but they have special execution characteristics:
+Rules run in priority order (then registration order), sync and async together. When the rules reach an async rule, it **starts and runs in the background**: the rules after it do not wait for it, and its result does not short-circuit them. An Error from a sync rule stops the later rules whose priority is above `ProcessThroughPriority` (default 0), including async rules that haven't started yet.
 
 ```csharp
 protected override void AddBusinessRules()
 {
     base.AddBusinessRules();
 
-    // Priority -1: Sync calculation runs first
+    // Priority -1: sync calculation runs first
     BusinessRules.AddRule(new CalcTotal(TotalProperty, SubtotalProperty, TaxProperty) { Priority = -1 });
 
-    // Priority 0: Async validation runs after sync rules at same priority
+    // Priority 0: async validation starts, then runs in the background
     BusinessRules.AddRule(new ValidateWithWebService(TotalProperty));
 
-    // Priority 1: Sync validation runs after async completes
+    // Priority 1: runs right away; does NOT wait for ValidateWithWebService
     BusinessRules.AddRule(new MinValue<decimal>(TotalProperty, 0) { Priority = 1 });
 }
 ```
 
 **Execution order:**
-1. All synchronous rules at priority -1
-2. All asynchronous rules at priority -1 (run concurrently)
-3. Wait for all async rules to complete
-4. All synchronous rules at priority 0
-5. All asynchronous rules at priority 0
-6. And so on...
+1. `CalcTotal` runs (sync). If it adds an Error, the later rules with a priority above `ProcessThroughPriority` (default 0) are skipped; here that's `MinValue`.
+2. `ValidateWithWebService` starts. The property is busy until it completes.
+3. `MinValue` runs immediately.
+4. When `ValidateWithWebService` completes, its broken rules and output values are applied, and the rules of its `AffectedProperties` run.
+
+Don't rely on a later rule seeing an async rule's result. Wait for completion with `await obj.WaitForIdle()` (or `await BusinessRules.CheckRulesAsync()`) before reading `IsValid` or saving.
+
+> **CSLA 11:** Set `IsSequential = true` on a `BusinessRuleAsync` to run it in the rule stream like a sync rule: the rules after it, for every property, wait until it completes, and its Error result (or `StopProcessing`) short-circuits them. Use it for rules that are async only because they read a database or service. `IsSequential` is a settable property: `BusinessRules.AddRule(new CustomerExists(CustomerIdProperty) { Priority = 1, IsSequential = true });`. Applies to `CheckRules()`, `CheckRules(property)` and `CheckObjectRules()`; `UseLegacyCheckRules()` ignores it. Custom `IBusinessRuleBase` implementations that don't inherit `BusinessRuleBase` must implement `IsSequential` (`true` for sync rules, `false` for async rules). See `v11/SequentialAsyncRules.md`.
 
 ## Async Rules and Dependencies
 
@@ -351,6 +353,21 @@ protected override void AddBusinessRules()
     BusinessRules.AddRule(new ValidateEmailWithService(EmailProperty, _httpClient));
 }
 ```
+
+## Waiting for Async Rules
+
+Wait for an object to become idle before reading `IsValid`, saving, or disposing resources the rules use (such as a DI scope):
+
+```csharp
+await customer.WaitForIdle();                       // also covers child objects
+await customer.WaitForIdle(TimeSpan.FromSeconds(10));
+if (customer.IsSavable)
+    customer = await customer.SaveAsync();
+```
+
+Calling `Save`/`SaveAsync` while the object is busy throws. `WaitForIdle()` only covers the object graph; if a rule starts rules on an object outside the graph, wait for that object separately.
+
+> **CSLA 11:** When an async rule completes, the object reports itself idle as the **last** step. `PropertyChanged` for the rule's properties, the `IsSelfValid`/`IsValid`/`IsSavable` changes and `ValidationComplete` are raised **before** `BusyChanged(property, false)`, so their handlers see `IsBusy == true`. Code after `await WaitForIdle()` or `await CheckRulesAsync()` always continues asynchronously, after all completion notifications, so disposing a scope there is safe. Don't dispose resources from inside `BusyChanged`/`IsBusy` handlers. Custom `IHostRules` implementations must add `PropertyIdle(IPropertyInfo)` and raise their busy notification there; `RuleComplete` no longer raises `BusyChanged`. After create, fetch or execute, the server-side data portal waits until the objects a `CommandBase` holds in managed properties are idle (`TimeoutException` after `CslaOptions.DefaultWaitForIdleTimeoutInSeconds`, default 90); wait yourself for objects a command keeps in private fields. See `v11/SequentialAsyncRules.md`.
 
 ## Exception Handling in Async Rules
 
@@ -438,7 +455,7 @@ See [AsyncRuleExceptionHandler.md](v10/AsyncRuleExceptionHandler.md) for more de
 4. **Keep rules focused** - Each async rule should do one thing well
 5. **Consider timeouts** - Add timeout logic for external service calls
 6. **Test async rules thoroughly** - Async code is harder to test, so write comprehensive tests
-7. **Use priorities carefully** - Remember that async rules at the same priority run concurrently
+7. **Use priorities carefully** - Priority controls when an async rule starts, not when later rules run; later rules don't wait for it (CSLA 11: set `IsSequential = true` when they must)
 8. **Log failures** - Always log unexpected failures for debugging
 9. **Provide user feedback** - Add appropriate error/warning/information messages
 10. **Optimize for performance** - Async rules can be expensive; only use them when necessary
@@ -541,8 +558,8 @@ public class CalculateFromService : BusinessRuleAsync
 ## Notes
 
 - Async rules always have `IsAsync = true`
-- Multiple async rules at the same priority level execute concurrently
-- Async rules execute after all synchronous rules at the same priority level
+- Async rules start in priority order and then run concurrently in the background; later rules don't wait for them (CSLA 11: unless the async rule has `IsSequential = true`)
+- An object with running async rules is busy (`IsBusy`, `IsPropertyBusy(property)`); it can't be saved until it is idle
 - Use `context.ApplicationContext.GetRequiredService<T>()` to get dependencies within rules
 - Async rules work seamlessly with the Data Portal across application boundaries
 - The UI remains responsive while async rules execute

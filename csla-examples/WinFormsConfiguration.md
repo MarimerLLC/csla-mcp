@@ -214,6 +214,47 @@ namespace BrownfieldWinForms.Pages
 }
 ```
 
+`SaveAsync()` on the business object throws when the save fails (`DataPortalException`) or the object isn't savable, so wrap it in `try`/`catch` and check `IsSavable` first.
+
+> **CSLA 11:** Windows Forms has no CSLA view model type of its own, but you can use the common `Csla.Mvvm.ViewModel<T>` (in the `Csla` package) directly. Pass an `ApplicationContext` to its constructor (`ManageObjectLifetime` is `false` by default). Its `RefreshAsync`/`SaveAsync` don't throw; they set `Exception` and `ViewModelErrorText` and raise `Error`. `Model` is replaced by the saved object, so rebind after saving:
+>
+> ```csharp
+> using Csla;
+> using Csla.Mvvm;
+>
+> public partial class PersonEditPage : UserControl
+> {
+>   private readonly IDataPortal<PersonEdit> _portal;
+>   private readonly ViewModel<PersonEdit> _vm;
+>
+>   public PersonEditPage(IDataPortal<PersonEdit> portal, ApplicationContext applicationContext)
+>   {
+>     _portal = portal;
+>     _vm = new ViewModel<PersonEdit>(applicationContext);
+>     InitializeComponent();
+>   }
+>
+>   public async void LoadData(int id)
+>   {
+>     await _vm.RefreshAsync(async () =>
+>       id == -1 ? await _portal.CreateAsync() : await _portal.FetchAsync(id));
+>     personEditBindingSource.DataSource = _vm.Model;
+>   }
+>
+>   private async void saveButton_Click(object sender, EventArgs e)
+>   {
+>     personEditBindingSource.EndEdit();
+>     await _vm.SaveAsync();
+>     if (_vm.Exception is null && string.IsNullOrEmpty(_vm.ViewModelErrorText))
+>       personEditBindingSource.DataSource = _vm.Model;
+>     else
+>       MessageBox.Show(_vm.ViewModelErrorText);
+>   }
+> }
+> ```
+>
+> Bind buttons to `CanSave`, `CanCancel` and the other status properties; the view model implements `INotifyPropertyChanged`. To get the `ApplicationContext` some other way, derive from `ViewModel<T>`, use the protected parameterless constructor and override `ResolveApplicationContext()`. See `v11/ViewModels.md`.
+
 ## Data Binding
 
 Windows Forms data binding is a powerful feature that works well with CSLA business objects. The `BindingSource` component is key to this integration.

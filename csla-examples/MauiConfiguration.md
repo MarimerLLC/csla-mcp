@@ -123,6 +123,10 @@ namespace MauiExample.ViewModels
 }
 ```
 
+In CSLA 10 on MAUI, `ManageObjectLifetime` defaults to `false`, and `SaveAsync()`/`RefreshAsync<F>()` throw when the operation fails.
+
+> **CSLA 11:** `ViewModelBase<T>` inherits the common `Csla.Mvvm.ViewModel<T>`. On MAUI, `ManageObjectLifetime` now defaults to `true` (set it to `false` to keep the CSLA 10 behavior), and the public `ManageObjectLifetimeProperty` field is removed; use the `ManageObjectLifetime` property. `SaveAsync()` and `RefreshAsync()` no longer throw: they set `Exception`/`ViewModelErrorText` and raise `Error`, so check `vm.Exception is null && string.IsNullOrEmpty(vm.ViewModelErrorText)` after `await vm.SaveAsync()` instead of using `try`/`catch`. `RefreshAsync<F>(factory)` is obsolete (call `RefreshAsync(factory)`), and `BeginAddNew` is obsolete (use `DoAddNew`). Direct `IDataPortal<T>` calls (as in `LoadPerson` below) still throw. See `v11/ViewModels.md`.
+
 ### Using the ViewModel in a Page
 
 ```csharp
@@ -165,6 +169,21 @@ public partial class PersonEditPage : ContentPage, IQueryAttributable
             await DisplayAlert("Error", ex.Message, "OK");
         }
     }
+
+    // Wired to the Save button's Clicked event. CSLA 10: SaveAsync throws on failure.
+    // CSLA 11: it doesn't throw; check _viewModel.Exception and ViewModelErrorText instead (see the callout above).
+    private async void SavePerson(object sender, EventArgs e)
+    {
+        try
+        {
+            await _viewModel.SaveAsync();
+            await Shell.Current.GoToAsync("..");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
 }
 ```
 
@@ -185,9 +204,10 @@ public partial class PersonEditPage : ContentPage, IQueryAttributable
                TextColor="Red"
                IsVisible="{Binding Model.IsValid, Converter={StaticResource InverseBooleanConverter}}" />
         
-        <Button Text="Save" 
-                Command="{Binding SaveCommand}"
-                IsEnabled="{Binding Model.IsSavable}" />
+        <!-- ViewModelBase<T> has no SaveCommand; handle Clicked in the page -->
+        <Button Text="Save"
+                Clicked="SavePerson"
+                IsEnabled="{Binding CanSave}" />
     </VerticalStackLayout>
 </ContentPage>
 ```
@@ -329,7 +349,7 @@ using Csla;
 namespace BusinessLibrary
 {
     [Serializable]
-    public class PersonList : ReadOnlyListBase<PersonList, PersonInfo>
+    public partial class PersonList : ReadOnlyListBase<PersonList, PersonInfo>
     {
         [Create, RunLocal]
         private void Create() { }

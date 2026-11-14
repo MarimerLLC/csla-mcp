@@ -72,7 +72,9 @@ The `ViewModel<T>` class is the foundation for Blazor pages that edit CSLA busin
 | `Model` | `T` | The CSLA business object being edited |
 | `IsBusy` | `bool` | True during async operations |
 | `ViewModelErrorText` | `string` | Error messages from save/refresh operations |
-| `ManageObjectLifetime` | `bool` | Controls n-level undo (default: false) |
+| `Exception` | `Exception?` | The exception from the last failed save/refresh |
+| `ManageObjectLifetime` | `bool` | Controls n-level undo (default: `false` for the Blazor view model in CSLA 10 and 11) |
+| `BusyTimeout` | `TimeSpan` | How long `SaveAsync` waits for a busy model (default 30 seconds) |
 
 ### Authorization Properties
 
@@ -89,10 +91,25 @@ The `ViewModel<T>` class is the foundation for Blazor pages that edit CSLA busin
 
 | Method | Description |
 |--------|-------------|
-| `RefreshAsync(Func<Task<T>>)` | Loads/creates a model asynchronously |
-| `SaveAsync()` | Saves the model asynchronously |
+| `RefreshAsync(Func<Task<T?>>)` | Loads/creates a model asynchronously; returns the model |
+| `SaveAsync()` | Saves the model asynchronously; returns `Task` in CSLA 10, `Task<T?>` (the saved model) in CSLA 11 |
 | `GetPropertyInfo(Expression<Func<P>>)` | Returns `Csla.Blazor.IPropertyInfo` - property metastate for UI binding |
-| `DoCancel()` | Cancels edits if ManageObjectLifetime is true |
+| `DoCancel()` | `protected virtual`; cancels edits if ManageObjectLifetime is true. Call it from a derived view model |
+| `OnModelChanged()` | `protected virtual`; override to react to a new model (CSLA 10 signature; see below for CSLA 11) |
+
+`RefreshAsync` and `SaveAsync` don't throw: failures set `Exception` and `ViewModelErrorText` and raise `Error`.
+
+> **CSLA 11:** `Csla.Blazor.ViewModel<T>` inherits the common `Csla.Mvvm.ViewModel<T>`, so it has the XAML view model members: it implements `INotifyPropertyChanged` and adds `IsDirty`, `IsValid`, `CanSave`, `CanCancel`, `CanCreate`, `CanDelete`, `CanFetch`, `CanAddNew`, `CanRemove` (updated on every model change, so instance-level authorization rules run on each change) and the protected `DoAddNew`, `DoRemove`, `DoDelete` methods. The parameterless `OnModelChanged()` override is **replaced** by `OnModelChanged(T? oldValue, T? newValue)`; update overrides or the build fails (CS0115):
+>
+> ```csharp
+> protected override void OnModelChanged(PersonEdit? oldValue, PersonEdit? newValue)
+> {
+>     base.OnModelChanged(oldValue, newValue);  // raises ModelChanged
+>     // react to the new model
+> }
+> ```
+>
+> `SaveAsync()` returns `Task<T?>`. With `ManageObjectLifetime = true`, `SaveAsync` saves a committed clone and calls `ApplyEdit` on `Model` only after the save succeeds, so `DoCancel` still works after a failed save. Use `vm.CanSave` instead of `vm.Model.IsSavable` for the Save button. See `v11/ViewModels.md`.
 
 ### Events
 
@@ -831,7 +848,7 @@ protected override async Task OnInitializedAsync()
     vm.Error += (sender, args) =>
     {
         // Log error, show toast, etc.
-        Console.WriteLine($"Error: {args.Exception.Message}");
+        Console.WriteLine($"Error: {args.Error.Message}");  // Csla.Core.ErrorEventArgs.Error
     };
 
     // ... rest of initialization

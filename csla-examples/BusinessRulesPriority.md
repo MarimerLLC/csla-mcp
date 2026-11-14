@@ -37,6 +37,10 @@ Rules execute in this order:
 2. **By Registration Order** - Rules with the same priority run in the order they were added
 3. **By Dependencies** - When a rule completes, rules for its `AffectedProperties` run
 
+This order applies when a property is set (`CheckRules(property)`), in every CSLA version. In CSLA 10, `BusinessRules.CheckRules()` also works property by property: priority only orders the rules within one property.
+
+> **CSLA 11:** `BusinessRules.CheckRules()` (and `CheckRulesAsync()`) runs as a batch: object-level rules first, then every property rule **once, in priority order across all properties** (same priority: CSLA 10 property order, then registration order). Then it reruns only the rules whose primary or input property was changed by a rule output value (`context.AddOutValue`). It does not rerun rules for `AffectedProperties` unless a value changed, and it does not rerun dependents of a property a rule changed directly (not through `AddOutValue`). Short-circuiting (`ProcessThroughPriority`, `StopProcessing`) still applies per property. Write calculation rules that set values with `context.AddOutValue` so the rerun pass sees the change. `CheckRules(property)` is unchanged. Configure with `services.AddCsla(o => o.Rules(r => r.UseBatchCheckRules(b => b.MaxRerunPasses = 200)))`; `r.UseLegacyCheckRules()` restores the CSLA 10 behavior temporarily. See `v11/CheckRulesExecution.md`.
+
 ## Short-Circuiting on Error
 
 **CRITICAL:** If a synchronous validation rule returns an **Error** severity result, rule execution stops immediately:
@@ -462,6 +466,8 @@ BusinessRules.AddRule(new Rule1(Property2, Property1)); // Sets Property2 based 
 // Don't add a reverse dependency
 ```
 
+> **CSLA 11:** With `CascadeOnDirtyProperties = true`, rules whose output values keep changing each other make `CheckRules()` throw `InvalidOperationException` (naming the properties) after `MaxRerunPasses` rerun passes (default 100), instead of recursing until a `StackOverflowException`. Fix the circular dependency; raise `MaxRerunPasses` only for chains that legitimately need more passes. See `v11/CheckRulesExecution.md`.
+
 ## CascadeIfDirty Option
 
 By default, rules cascade whenever the primary property changes. Use `CascadeIfDirty` to only cascade when the property is truly dirty:
@@ -479,6 +485,8 @@ public class MyRule : BusinessRule
 ```
 
 This prevents unnecessary rule execution during object initialization or when loading from the database.
+
+> **CSLA 11:** `CascadeIfDirty` has no effect in `CheckRules()`, because the batch runner only reruns rules when a value changed. It still applies to `CheckRules(property)` and to rules that run when a property is set. See `v11/CheckRulesExecution.md`.
 
 ## RunMode: Controlling When Rules Execute
 
@@ -614,9 +622,9 @@ BusinessRules.AddRule(new IsInRole(AuthorizationActions.WriteProperty, NamePrope
 ## Notes
 
 - Rules with the same priority execute in registration order
-- Priority is per-property, not global - two rules on different properties can have the same priority
+- Priority orders the rules of one property when that property is set. For `CheckRules()`, priority is per-property in CSLA 10 and global (across all properties) in CSLA 11
 - `Dependency` rules don't have priorities - they just trigger other rules
-- Async rules (see [BusinessRulesAsync.md](BusinessRulesAsync.md)) run after all synchronous rules at their priority level
+- Async rules (see [BusinessRulesAsync.md](BusinessRulesAsync.md)) start in priority order and then run in the background: later rules don't wait for them and their results don't short-circuit later rules. In CSLA 11, an async rule with `IsSequential = true` runs in priority order like a sync rule: later rules wait for it and its result can short-circuit them (see `v11/SequentialAsyncRules.md`)
 - Authorization rules (see [BusinessRulesAuthorization.md](BusinessRulesAuthorization.md)) typically use default priority
 
 ## See Also
