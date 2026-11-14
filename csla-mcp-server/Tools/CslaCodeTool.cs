@@ -13,6 +13,20 @@ namespace CslaMcpServer.Tools
     public static string CodeSamplesPath { get; set; } = @"../csla-examples";
     public static VectorStoreService? VectorStore { get; set; }
 
+    /// <summary>
+    /// The built-in default CSLA version, used when CSLA_DEFAULT_VERSION is not set.
+    /// </summary>
+    public const int BuiltInDefaultVersion = 10;
+
+    /// <summary>
+    /// The CSLA version targeted when a caller does not specify one. Configured at
+    /// startup from the CSLA_DEFAULT_VERSION environment variable. This is deliberately
+    /// not "highest folder available", so a newer version folder (e.g. v11) can be added
+    /// and tested by passing the version explicitly without changing what existing
+    /// callers get.
+    /// </summary>
+    public static int DefaultVersion { get; set; } = BuiltInDefaultVersion;
+
     public class SearchResult
     {
       public double Score { get; set; }
@@ -67,9 +81,9 @@ namespace CslaMcpServer.Tools
     [McpServerTool, Description(mcpServerDescription)]
     public async Task<string> Search(
       [Description(searchDescription)]string message,
-      [Description("Optional CSLA version number (e.g., 9, 10, or 11). If not provided, defaults to the highest version available.")]int? version = null)
+      [Description("Optional CSLA version number (e.g., 9, 10 or 11). If not provided, defaults to the server's configured default CSLA version.")]int? version = null)
     {
-      logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? "not specified (will use highest)");
+      logger.LogInformation("[CslaCodeTool.Search] Called with message: '{Message}', version: {Version}", message, version?.ToString() ?? $"not specified (will use default v{DefaultVersion})");
       
       try
       {
@@ -87,11 +101,11 @@ namespace CslaMcpServer.Tools
           }, new JsonSerializerOptions { WriteIndented = true });
         }
 
-        // If version not specified, detect highest version from subdirectories
+        // If version not specified, use the configured default version
         if (!version.HasValue)
         {
-          version = GetHighestVersionFromFileSystem();
-          logger.LogInformation("[CslaCodeTool.Search] Version not specified, defaulting to highest: v{Version}", version);
+          version = DefaultVersion;
+          logger.LogInformation("[CslaCodeTool.Search] Version not specified, using configured default: v{Version}", version);
         }
 
         var csFiles = Directory.GetFiles(CodeSamplesPath, "*.cs", SearchOption.AllDirectories);
@@ -406,34 +420,6 @@ namespace CslaMcpServer.Tools
       }
       
       return semanticMatches;
-    }
-
-    private int GetHighestVersionFromFileSystem()
-    {
-      try
-      {
-        var versionDirs = Directory.GetDirectories(CodeSamplesPath, "v*")
-          .Select(dir => Path.GetFileName(dir))
-          .Where(name => name.StartsWith("v") && int.TryParse(name.Substring(1), out _))
-          .Select(name => int.Parse(name.Substring(1)))
-          .ToList();
-        
-        if (versionDirs.Any())
-        {
-          var highest = versionDirs.Max();
-          logger.LogInformation("[CslaCodeTool.GetHighestVersionFromFileSystem] Found versions: [{Versions}], highest: {Highest}", string.Join(", ", versionDirs.OrderBy(v => v)), highest);
-          return highest;
-        }
-      }
-      catch (Exception ex)
-      {
-        logger.LogError(ex, "[CslaCodeTool.GetHighestVersionFromFileSystem] Error detecting versions: {Message}", ex.Message);
-      }
-      
-      // No version directories found - return a reasonable default
-      // This will be used when all content is in the root directory (common to all versions)
-      logger.LogInformation("[CslaCodeTool.GetHighestVersionFromFileSystem] No version directories found, defaulting to latest known CSLA version");
-      return 10; // Default fallback when no version subdirectories exist
     }
 
     private static int CountWordOccurrences(string content, string searchTerm)
