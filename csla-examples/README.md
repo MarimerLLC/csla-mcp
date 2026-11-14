@@ -8,7 +8,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 1. **Start with Search** - Use the `search` tool with natural language queries like "editable root save" or "async business rule" to find relevant documents
 2. **Fetch the Best Matches** - Use the `fetch` tool to retrieve the content of high-scoring documents from search results
-3. **Check Version** - If your search doesn't specify a version, the server defaults to the highest version available (currently v10). Specify `version: 9` if you need CSLA 9-specific patterns
+3. **Check Version** - If your search doesn't specify a version, the server defaults to its configured default version (currently v10). Specify `version: 9` if you need CSLA 9-specific patterns
 
 ### Recommended Workflow
 
