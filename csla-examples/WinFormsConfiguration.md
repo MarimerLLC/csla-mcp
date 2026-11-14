@@ -227,7 +227,8 @@ namespace BrownfieldWinForms.Pages
 >   private readonly IDataPortal<PersonEdit> _portal;
 >   private readonly ViewModel<PersonEdit> _vm;
 >
->   public PersonEditPage(IDataPortal<PersonEdit> portal, ApplicationContext applicationContext)
+>   // Csla.ApplicationContext, not System.Windows.Forms.ApplicationContext (CS0104)
+>   public PersonEditPage(IDataPortal<PersonEdit> portal, Csla.ApplicationContext applicationContext)
 >   {
 >     _portal = portal;
 >     _vm = new ViewModel<PersonEdit>(applicationContext);

@@ -91,6 +91,9 @@ An authorization rule that throws while the status properties (`CanSave`, `CanEd
         // Subscribe once; vm is scoped to the component
         vm.Saved += () => NavigationManager.NavigateTo("listpersons");
         vm.ModelPropertyChanged += async (s, e) => await InvokeAsync(StateHasChanged);
+        // CanSave, ViewModelErrorText and the permission properties change on the view model
+        // itself (for example when an async authorization rule completes); Blazor doesn't watch it
+        vm.PropertyChanged += async (s, e) => await InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnParametersSetAsync()
@@ -181,7 +184,8 @@ Use `Csla.Mvvm.ViewModel<T>` directly. Pass the `ApplicationContext`, or derive 
 ```csharp
 public class CustomerEditViewModel : Csla.Mvvm.ViewModel<CustomerEdit>
 {
-    public CustomerEditViewModel(ApplicationContext applicationContext)
+    // Qualify Csla.ApplicationContext: Windows Forms also has System.Windows.Forms.ApplicationContext (CS0104)
+    public CustomerEditViewModel(Csla.ApplicationContext applicationContext)
         : base(applicationContext, manageObjectLifetime: true)
     { }
 
@@ -196,7 +200,7 @@ public partial class CustomerEditForm : Form
     private readonly IDataPortal<CustomerEdit> _portal;
     private readonly int _customerId;
 
-    public CustomerEditForm(ApplicationContext applicationContext, IDataPortal<CustomerEdit> portal, int customerId)
+    public CustomerEditForm(Csla.ApplicationContext applicationContext, IDataPortal<CustomerEdit> portal, int customerId)
     {
         InitializeComponent();
         _portal = portal;

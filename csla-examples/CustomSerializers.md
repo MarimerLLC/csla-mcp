@@ -258,8 +258,12 @@ In CSLA 10, analyzer CSLA0010 reports data portal operation arguments of these t
 > **CSLA 11:** Declare serializers with attributes, then register every declaration in an assembly with `AddCustomSerializers`. CSLA0010 reads the declarations and stops reporting those types.
 >
 > ```csharp
+> // Serializers.cs
 > using Csla.Serialization.Mobile;
 > using Csla.Serialization.Mobile.CustomSerializers;  // PocoSerializer<T>
+>
+> // a type and serializer you don't own; assembly attributes go before any type declaration (CS1730)
+> [assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
 >
 > [MobileSerializer(typeof(MyCustomSerializer))]             // on a type you own
 > public class MyComplexType { ... }
@@ -269,10 +273,10 @@ In CSLA 10, analyzer CSLA0010 reports data portal operation arguments of these t
 >
 > [MobileSerializerFor(typeof(ThirdParty.Models.ApiRequest))] // on a serializer, for types you don't own
 > public class ApiRequestSerializer : IMobileSerializer { ... }
+> ```
 >
-> // a type and serializer you don't own
-> [assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
->
+> ```csharp
+> // Program.cs (startup)
 > services.AddCsla(o => o
 >     .Serialization(s => s
 >         .UseMobileFormatter(m => m.AddCustomSerializers(typeof(MyComplexType).Assembly))));

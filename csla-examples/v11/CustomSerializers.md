@@ -95,6 +95,10 @@ In CSLA 11, prefer declaring the serializer with an attribute and registering th
 using Csla.Serialization.Mobile;
 using Csla.Serialization.Mobile.CustomSerializers;
 
+// 3. Assembly level, when you own neither the type nor the serializer.
+//    Assembly attributes go after the usings and before any type declaration (CS1730).
+[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
+
 // 1. On a type you own
 [MobileSerializer(typeof(AddressInfoSerializer))]
 public class AddressInfo { /* ... */ }
@@ -105,9 +109,6 @@ public class CustomerDto { /* ... */ }
 // 2. On a serializer, for types you don't own (one or more)
 [MobileSerializerFor(typeof(ExternalApi.Models.ApiResponse))]
 public class ApiResponseSerializer : IMobileSerializer { /* ... */ }
-
-// 3. Assembly level, when you own neither the type nor the serializer
-[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
 ```
 
 Register every declared serializer in an assembly at startup, on both client and server:

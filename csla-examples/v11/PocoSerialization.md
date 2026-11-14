@@ -29,15 +29,19 @@ public void ConfigureServices(IServiceCollection services)
 Instead of a `TypeMap` per type, put `[MobileSerializer]` on the POCO (or an assembly-level registration for a type you don't own) and register the assembly once. Analyzer CSLA0010 then stops reporting the POCO as a non-serializable criteria type:
 
 ```csharp
+// CustomerCriteria.cs
 using Csla.Serialization.Mobile;
 using Csla.Serialization.Mobile.CustomSerializers;
 
-[MobileSerializer(typeof(PocoSerializer<CustomerCriteria>))]
-public class CustomerCriteria { /* ... */ }
-
-// For a third-party type
+// For a third-party type. Assembly attributes go before any type declaration (CS1730)
 [assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
 
+[MobileSerializer(typeof(PocoSerializer<CustomerCriteria>))]
+public class CustomerCriteria { /* ... */ }
+```
+
+```csharp
+// Program.cs (startup)
 services.AddCsla(options => options
     .Serialization(s => s
         .UseMobileFormatter(m => m.AddCustomSerializers(typeof(CustomerCriteria).Assembly))));

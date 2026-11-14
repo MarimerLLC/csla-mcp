@@ -97,7 +97,7 @@ The `ViewModel<T>` class is the foundation for Blazor pages that edit CSLA busin
 | `DoCancel()` | `protected virtual`; cancels edits if ManageObjectLifetime is true. Call it from a derived view model |
 | `OnModelChanged()` | `protected virtual`; override to react to a new model (CSLA 10 signature; see below for CSLA 11) |
 
-`RefreshAsync` and `SaveAsync` don't throw: failures set `Exception` and `ViewModelErrorText` and raise `Error`.
+`RefreshAsync` and `SaveAsync` don't throw: failures set `Exception` and `ViewModelErrorText`. `SaveAsync` failures also raise `Error`. In CSLA 10, `RefreshAsync` failures don't raise `Error`, so check `vm.Exception` (or `ViewModelErrorText`) after `await vm.RefreshAsync(...)`. In CSLA 11 both raise `Error`.
 
 > **CSLA 11:** `Csla.Blazor.ViewModel<T>` inherits the common `Csla.Mvvm.ViewModel<T>`, so it has the XAML view model members: it implements `INotifyPropertyChanged` and adds `IsDirty`, `IsValid`, `CanSave`, `CanCancel`, `CanCreate`, `CanDelete`, `CanFetch`, `CanAddNew`, `CanRemove` (updated on every model change, so instance-level authorization rules run on each change) and the protected `DoAddNew`, `DoRemove`, `DoDelete` methods. The parameterless `OnModelChanged()` override is **replaced** by `OnModelChanged(T? oldValue, T? newValue)`; update overrides or the build fails (CS0115):
 >

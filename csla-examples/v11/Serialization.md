@@ -117,17 +117,22 @@ services.AddCsla(options => options
 Instead of a `TypeMap` per type, declare the serializer on the type (or on the serializer) and register the assembly once:
 
 ```csharp
+// Serializers.cs
 using Csla.Serialization.Mobile;
 using Csla.Serialization.Mobile.CustomSerializers;
+
+// Assembly attributes go before any type declaration (CS1730)
+[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
 
 [MobileSerializer(typeof(PocoSerializer<AddressInfo>))]
 public class AddressInfo { /* ... */ }
 
 [MobileSerializerFor(typeof(ThirdParty.Widget))]       // type you don't own
 public class WidgetSerializer : IMobileSerializer { /* ... */ }
+```
 
-[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
-
+```csharp
+// Program.cs (startup)
 services.AddCsla(options => options
     .Serialization(so => so.UseMobileFormatter(mf =>
         mf.AddCustomSerializers(typeof(AddressInfo).Assembly))));
