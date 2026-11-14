@@ -8,7 +8,7 @@ This folder contains documentation and code examples for the CSLA .NET framework
 
 1. **Start with Search** - Use the `search` tool with natural language queries like "editable root save" or "async business rule" to find relevant documents
 2. **Fetch the Best Matches** - Use the `fetch` tool to retrieve the content of high-scoring documents from search results
-3. **Check Version** - If your search doesn't specify a version, the server defaults to its configured default version (currently v10). Specify `version: 11` for CSLA 11 patterns, or `version: 9` if you need CSLA 9-specific patterns
+3. **Check Version** - If your search doesn't specify a version, the server defaults to its configured default version (currently v10, which changes to v11 when CSLA 11.0.0 is released). Specify `version: 11` for CSLA 11 patterns, or `version: 9` if you need CSLA 9-specific patterns
 
 ### Recommended Workflow
 
@@ -88,7 +88,7 @@ The `v9/`, `v10/` and `v11/` subdirectories contain version-specific implementat
 
 | Folder | CSLA Version | Key Differences |
 | -------- | -------------- | ----------------- |
-| `v11/` | CSLA 11 | Targets .NET 10/11; source generators bundled in the `Csla` package; operation methods must have attributes (no `DataPortal_XYZ` name lookup); business classes should be `partial`; optional `[DataPortalExtensions]`; `AllowNew`/`AllowRemove` enforced |
+| `v11/` | CSLA 11 | Targets .NET 10/11; source generators bundled in the `Csla` package; operation methods must have attributes (no `DataPortal_XYZ` name lookup); business classes should be `partial`; optional `[DataPortalExtensions]`; `AllowNew`/`AllowRemove` enforced; batch `CheckRules()` and `IsSequential` async rules; `[CalculatedProperty]`; common `Csla.Mvvm.ViewModel<T>` |
 | `v10/` | CSLA 10.x | Uses `[CslaImplementProperties]` for code generation, partial properties |
 | `v9/` | CSLA 9.x | Manual property implementation with `GetProperty`/`SetProperty` |
 
@@ -112,7 +112,13 @@ External Links:
 - `DataPortalOperationDispatch.md` - Generated `IDataPortalOperations` dispatch and why classes should be `partial`
 - `TransactionScopeFactory.md` - `[Transactional]`, `DataOptions` transaction defaults and `ITransactionScopeFactory`
 - `AzureTableStorageSessionStore.md` - `Csla.Blazor.State.AzureTableStorage` package: Blazor session store in Azure Table Storage, client selection, multi-server behavior and purging
-- `Analyzers.md` - CSLA analyzer and generator diagnostics reference (CSLA0002-CSLA0025, CSLADP002-CSLADP011)
+- `Analyzers.md` - CSLA analyzer, suppressor and generator diagnostics reference (CSLA0002-CSLA0030, CSLA1001-CSLA1004, CSLADP002-CSLADP011)
+- `CheckRulesExecution.md` - Batch `CheckRules()`: priority order across all properties, reruns from output values, `MaxRerunPasses`, `UseBatchCheckRules`/`UseLegacyCheckRules`
+- `SequentialAsyncRules.md` - `IsSequential` async rules that run in priority order, and async rule completion order (idle last, `WaitForIdle`, `IHostRules.PropertyIdle`)
+- `CalculatedProperties.md` - `[CalculatedProperty]` for rule-calculated values that aren't serialized and don't mark the object dirty
+- `ViewModels.md` - `Csla.Mvvm.ViewModel<T>` and the Blazor/XAML view models: `SaveAsync`/`RefreshAsync` error handling, `ManageObjectLifetime`, Windows Forms usage
+- `AspNetCoreModelBinding.md` - `CslaModelBinder`: binding child objects and child lists, `TryUpdateModelAsync`, `[BindNever]`/`[Bind]`
+- `TrimmingAndNativeAot.md` - Writing CSLA code for trimmed and NativeAOT apps
 
 ## Document Relationships
 
@@ -167,7 +173,6 @@ External Links:
 - "custom data portal channel" - Find channel implementation guidance
 - "upgrade to CSLA 11" - Find migration guidance for breaking changes
 - "strongly typed data portal extension methods" - Find `[DataPortalExtensions]` usage
-
 **The search combines:**
 
 - **Semantic/vector search** - Understands concept similarity
