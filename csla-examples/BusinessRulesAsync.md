@@ -311,7 +311,7 @@ public abstract class AsyncLookupRule : BusinessRule
 
 ## Async Rules and Priority
 
-Rules run in priority order (then registration order), sync and async together. When the rules reach an async rule, it **starts and runs in the background**: the rules after it do not wait for it, and its result does not short-circuit them. An Error from a sync rule stops the later rules whose priority is above `ProcessThroughPriority` (default 0), including async rules that haven't started yet.
+Rules run in priority order (then registration order), sync and async together. When the rules reach an async rule, it **starts and runs in the background**: the rules after it do not wait for it, and its result does not short-circuit them. An Error from a sync rule stops the later rules **of the same property** whose priority is above `ProcessThroughPriority` (default 0), including async rules that haven't started yet. Short-circuiting is always per property: rules for other properties still run.
 
 ```csharp
 protected override void AddBusinessRules()

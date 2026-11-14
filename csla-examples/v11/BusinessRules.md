@@ -579,32 +579,9 @@ See `SequentialAsyncRules.md`.
 
 ### How `CheckRules()` orders rules in CSLA 11
 
-`BusinessRules.CheckRules()` (and `CheckRulesAsync()`) runs rules as a batch:
+`BusinessRules.CheckRules()` runs every property rule once, in priority order **across all properties**, then reruns only rules whose inputs were changed through `context.AddOutValue`. So set calculated values with `context.AddOutValue`, never by writing to the target object. Short-circuiting stays per property, and `CheckRules(property)` is unchanged.
 
-1. Object-level rules run first.
-2. Every property rule runs once, in priority order **across all properties**. A `Priority = 1` rule on `Name` runs before a `Priority = 2` rule on `Email`. Equal priorities run by property (in the order the property's first rule was added), then in the order the rules were added.
-3. Rules rerun only when a rule changed a value through `context.AddOutValue`: the rules of the changed property, and the rules that use it as an input property, run again once. With `CascadeOnDirtyProperties = true` this repeats until no value changes, and throws `InvalidOperationException` after `MaxRerunPasses` passes (default 100).
-
-Consequences for rule code:
-
-* Change other properties only through `context.AddOutValue`. A rule that writes to the target object directly doesn't trigger reruns in `CheckRules()`.
-* `AffectedProperties` alone don't make rules rerun in `CheckRules()`; they already ran once in the batch.
-* `CascadeIfDirty` has no effect in `CheckRules()`. It still applies to `CheckRules(property)`.
-* Short-circuiting (`ProcessThroughPriority`, `StopProcessing`) still applies per property.
-* `CheckRules(property)`, the rules that run when a property is set, and `CheckObjectRules()` are unchanged.
-
-Configure it in `AddCsla`:
-
-```csharp
-services.AddCsla(o => o
-    .Rules(r => r.UseBatchCheckRules(b => b.MaxRerunPasses = 200)));   // default 100
-
-// Temporary: CSLA 10 behavior (priority only within a property, recursive cascading)
-services.AddCsla(o => o
-    .Rules(r => r.UseLegacyCheckRules()));
-```
-
-See `CheckRulesExecution.md`.
+See `CheckRulesExecution.md` for the full algorithm, `MaxRerunPasses`, `CascadeIfDirty` and configuration (`UseBatchCheckRules` / `UseLegacyCheckRules`).
 
 ## Rule Severity Levels
 

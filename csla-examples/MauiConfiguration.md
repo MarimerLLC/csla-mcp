@@ -170,20 +170,31 @@ public partial class PersonEditPage : ContentPage, IQueryAttributable
         }
     }
 
-    // Wired to the Save button's Clicked event. CSLA 10: SaveAsync throws on failure.
-    // CSLA 11: it doesn't throw; check _viewModel.Exception and ViewModelErrorText instead (see the callout above).
+    // Wired to the Save button's Clicked event. Use the variant for your CSLA version.
+
+    // CSLA 11: SaveAsync doesn't throw; check Exception and ViewModelErrorText
     private async void SavePerson(object sender, EventArgs e)
     {
-        try
-        {
-            await _viewModel.SaveAsync();
+        await _viewModel.SaveAsync();
+        if (_viewModel.Exception is null && string.IsNullOrEmpty(_viewModel.ViewModelErrorText))
             await Shell.Current.GoToAsync("..");
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlert("Error", ex.Message, "OK");
-        }
+        else
+            await DisplayAlert("Error", _viewModel.ViewModelErrorText, "OK");
     }
+
+    // CSLA 10: SaveAsync throws on failure
+    // private async void SavePerson(object sender, EventArgs e)
+    // {
+    //     try
+    //     {
+    //         await _viewModel.SaveAsync();
+    //         await Shell.Current.GoToAsync("..");
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         await DisplayAlert("Error", ex.Message, "OK");
+    //     }
+    // }
 }
 ```
 

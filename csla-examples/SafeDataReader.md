@@ -255,7 +255,10 @@ string name = await safeReader.GetFieldValueAsync<string>(ordinal, cancellationT
 > ```csharp
 > await using var cm = connection.CreateCommand();
 > cm.CommandText = "SELECT Id, Name, Age FROM Person WHERE Id = @Id";
-> cm.Parameters.AddWithValue("@Id", id);
+> var idParameter = cm.CreateParameter();   // provider-neutral (AddWithValue is SqlClient-only)
+> idParameter.ParameterName = "@Id";
+> idParameter.Value = id;
+> cm.Parameters.Add(idParameter);
 >
 > await using var dr = new SafeDataReader(await cm.ExecuteReaderAsync(ct));
 > if (await dr.ReadAsync(ct))

@@ -122,19 +122,34 @@ Rules for your code:
 
 ### `IHostRules`
 
-`IHostRules.RuleComplete(IPropertyInfo)` no longer raises `BusyChanged`. The new `PropertyIdle(IPropertyInfo)` is called when no async rules are running for the property. If you implement `IHostRules` yourself (rare; `BusinessBase` already does), add it and raise your busy notification there:
+`IHostRules.RuleComplete(IPropertyInfo)` no longer raises `BusyChanged`. The new `PropertyIdle(IPropertyInfo)` is called when no async rules are running for the property. If you implement `IHostRules` yourself (rare; `BusinessBase` already does), implement all five members and raise your busy notification only in `PropertyIdle`:
 
 ```csharp
 // In a custom IHostRules implementation (BusinessBase does the equivalent)
+void IHostRules.RuleStart(IPropertyInfo property)
+{
+    // Mark the property busy and raise BusyChanged(property.Name, true)
+}
+
+void IHostRules.RuleComplete(IPropertyInfo property)
+{
+    // Raise PropertyChanged for the property; don't raise BusyChanged
+}
+
+void IHostRules.RuleComplete(string property)
+{
+    // Raise PropertyChanged for the named property; don't raise BusyChanged
+}
+
 void IHostRules.PropertyIdle(IPropertyInfo property)
 {
     ArgumentNullException.ThrowIfNull(property);
     BusyChanged?.Invoke(this, new BusyChangedEventArgs(property.Name, false));
 }
 
-void IHostRules.RuleComplete(IPropertyInfo property)
+void IHostRules.AllRulesComplete()
 {
-    // Raise PropertyChanged for the property here; don't raise BusyChanged
+    // Raise ValidationComplete
 }
 ```
 

@@ -279,9 +279,8 @@ In CSLA 10, analyzer CSLA0010 reports data portal operation arguments of these t
 > ```
 >
 > - Pass **every** assembly that declares serializers to `AddCustomSerializers(params Assembly[])`. Assemblies aren't scanned automatically: an assembly you don't pass satisfies the analyzer but fails at run time. Register on every tier (client and server).
-> - Each declaration maps one exact type (derived types aren't covered). Generic types can't be declared; keep `CustomSerializers.Add(new TypeMap<T, S>(...))` for them. `TypeMap` registrations still work; serializers already in `CustomSerializers` when `AddCustomSerializers` runs come first.
-> - The serializer must be a non-abstract class implementing `IMobileSerializer` with a public constructor, non-generic or closed generic (`PocoSerializer<Customer>`), and public or internal. The serialized type must be a non-generic class or struct that `MobileFormatter` doesn't already handle (not a primitive, `string`, `Guid`, date/time type or `IMobileObject`). Violations: **CSLA0028**. A type mapped to more than one serializer: **CSLA0029**.
-> - `AddCustomSerializers` reads generated assembly attributes without scanning types, so it is trim-safe (`PocoSerializer<T>` itself is not).
+> - Generic types can't be declared; keep `CustomSerializers.Add(new TypeMap<T, S>(...))` for them.
+> - Full rules (exact-type mapping, valid declarations and CSLA0028/CSLA0029, precedence, trimming) are in `v11/CustomSerializers.md`.
 
 ## SerializationInfo Supported Types
 

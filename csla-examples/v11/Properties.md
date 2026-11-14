@@ -238,7 +238,7 @@ Use `LazyGetPropertyAsync` (in `BusinessBase` and `ReadOnlyBase`) with a factory
 
 ```csharp
 public static readonly PropertyInfo<ShipmentInfo> ShipmentProperty =
-    RegisterProperty<ShipmentInfo>(nameof(Shipment));
+    RegisterProperty<ShipmentInfo>(nameof(Shipment), RelationshipTypes.LazyLoad);
 
 public ShipmentInfo? Shipment =>
     LazyGetPropertyAsync(ShipmentProperty,

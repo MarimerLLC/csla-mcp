@@ -133,9 +133,9 @@ services.AddCsla(options => options
         mf.AddCustomSerializers(typeof(AddressInfo).Assembly))));
 ```
 
-* Pass every assembly that declares serializers to `AddCustomSerializers`; nothing is scanned automatically.
-* Each declaration covers the exact type only, not derived types. Generic target types still need `TypeMap`.
-* Analyzer CSLA0010 doesn't report operation arguments of declared types; CSLA0028 reports invalid declarations and CSLA0029 types with more than one serializer.
+* Pass every assembly that declares serializers to `AddCustomSerializers`, on client and server. Nothing is scanned automatically: an assembly that isn't passed satisfies the analyzer but fails at run time.
+* Generic target types still need `TypeMap`.
+* Full rules (exact-type mapping, CSLA0028/CSLA0029, precedence, trimming) are in `CustomSerializers.md`.
 
 See `CustomSerializers.md`.
 
