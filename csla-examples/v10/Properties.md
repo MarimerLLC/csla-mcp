@@ -352,6 +352,7 @@ public partial class CustomerInfo : ReadOnlyBase<CustomerInfo>
 5. **Use LoadProperty/ReadProperty** in data portal operations
 6. **Use normal property syntax** in business logic and UI code
 7. **Group related properties** with blank lines for readability
+8. **Match nullability to reality** in hand-written properties: `GetProperty` returns `P?`, so use `GetProperty(XProperty)!` when the value can't be null and declare the property `T?` when it can (see `NullableProperties.md`)
 
 ## Common Patterns
 
