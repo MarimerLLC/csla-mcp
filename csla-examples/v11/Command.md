@@ -126,6 +126,7 @@ string tracking = command.TrackingNumber;
 * The method must have the `[Execute]` attribute. The data portal no longer finds a method named `DataPortal_Execute` by name, and an attribute-less method is never called (analyzer `CSLA0014` warns and its code fix adds the attribute).
 * With the attribute, the method can have any name and be `private`.
 * `CommandBase` no longer contains private "not supported" `DataPortal_XYZ` methods, so calling an operation a command doesn't implement (such as fetch) fails with the data portal's normal "method not found" error.
+* If the command holds business objects in managed properties, the server-side data portal waits after create, fetch or execute until those objects are idle (their async rules finished) before returning the command, and throws `TimeoutException` after `DefaultWaitForIdleTimeoutInSeconds` (default 90). Objects kept in private fields aren't covered: `await obj.WaitForIdle()` in the `Execute` method.
 
 ## Property Access in Commands
 

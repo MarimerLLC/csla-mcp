@@ -9,8 +9,16 @@ This document applies to CSLA 11. It lists every Roslyn analyzer diagnostic ship
 | CSLA0014 | Severity raised from **Info** to **Warning**. The data portal no longer calls methods by name (`DataPortal_Fetch`, `Child_Update`, ...), so an attribute-less method with a legacy name is never called. The code fix adds the matching operation attribute. |
 | CSLA0024 | **New.** A class with data portal operation methods should be `partial` so the operations generator can dispatch without reflection. Code fix adds `partial`. |
 | CSLA0025 | **New.** Use the generated `[DataPortalExtensions]` method instead of calling an untyped `IDataPortal<T>` method. Code fix replaces the call. |
+| CSLA0026, CSLA0027 | **New.** Check `[CalculatedProperty]` use. |
+| CSLA0028, CSLA0029 | **New.** Check custom serializer declarations (`[MobileSerializer]`, `[MobileSerializerFor]`, `[assembly: MobileSerializerRegistration]`). |
+| CSLA0030 | **New.** `[CslaImplementProperties]` / `[CslaImplementPropertiesInterface<T>]` can't generate properties. |
+| CSLA0007 | Reports more getters (`=> GetProperty(NameProperty).ToUpper()`), accepts `GetProperty(NameProperty)!`, and reports on the accessor's expression or body instead of the whole accessor. Generated properties are no longer wrapped in `#pragma warning disable CSLA0007`. |
+| CSLA0010 | No longer reports operation arguments whose type has a declared custom serializer (including `ClaimsPrincipal`). |
+| CSLA1001 - CSLA1004 | **New** diagnostic suppressors that hide .NET style/quality false positives on CSLA code (see below). |
 | CSLADP002 - CSLADP011 | **New.** Diagnostics for the bundled data portal operations and extensions generators. They are reported by analyzers (not by the generators), so they can be suppressed in source or `.editorconfig`. |
 | CSLABUILD001 | **New** MSBuild error (not an analyzer): the retired `Csla.Generator.AutoImplementProperties.CSharp` package is still referenced. |
+
+The code fixes moved from `Csla.Analyzers.dll` into `Csla.Analyzers.CodeFixes.dll`; both ship in the `Csla` package. Only projects that reference `Csla.Analyzers.dll` directly by path must add the new assembly to keep the code fixes.
 
 ## CSLA analyzers
 
@@ -21,7 +29,7 @@ This document applies to CSLA 11. It lists every Roslyn analyzer diagnostic ship
 | CSLA0004 | Warning | A CSLA business class has a public constructor with parameters. | No |
 | CSLA0005 | Error | The result of `Save()` is ignored (`obj.Save();` instead of `obj = obj.Save();`). | Yes: add the assignment |
 | CSLA0006 | Error | The result of `SaveAsync()` is ignored. | Yes: add the assignment |
-| CSLA0007 | Warning | A property that uses a managed backing field does more than call `GetProperty`/`SetProperty`/`ReadProperty`/`LoadProperty`. A null-forgiving `!` on the call, as in `GetProperty(NameProperty)!`, is allowed (see `NullableProperties.md`). | No |
+| CSLA0007 | Warning | A property that uses a managed backing field does more than call `GetProperty`/`SetProperty`/`ReadProperty`/`LoadProperty` (or the `Lazy...` variants). Reports expression-bodied getters that wrap the call, such as `=> GetProperty(NameProperty).ToUpper()`. A null-forgiving `!` on the call, as in `GetProperty(NameProperty)!`, is allowed (see `NullableProperties.md`). | No |
 | CSLA0008 | Error | A managed backing field (`PropertyInfo<T>`) is not `public static readonly`. | Yes: fix the field declaration |
 | CSLA0009 | Warning | A data portal operation is declared `public` on a business object interface. | No |
 | CSLA0010 | Warning | An operation method's criteria argument type is not serializable. | No |
@@ -40,6 +48,11 @@ This document applies to CSLA 11. It lists every Roslyn analyzer diagnostic ship
 | CSLA0023 | Info | A managed backing field is registered with a lambda (`RegisterProperty<T>(c => c.Name)`) instead of `nameof(Name)`. | Yes: use `nameof` |
 | CSLA0024 | Warning (**new**) | A class (not a record) declares data portal operation methods but the class, or a type containing it, is not `partial`. | Yes: add `partial` to the class and its containing types |
 | CSLA0025 | Warning (**new**) | Code calls an untyped criteria method (`Create`, `Fetch`, `Delete`, criteria `Execute`, `CreateChild`, `FetchChild`, or their `Async` forms) on `IDataPortal<T>`, `IChildDataPortal<T>` or `DataPortal<T>` when `T` (or its assembly) has `[DataPortalExtensions]` and a generated extension method can replace the call. | Yes: replace with the generated extension method |
+| CSLA0026 | Warning (**new**) | A `[CalculatedProperty]` property has a setter (including `init`) that isn't `private`. Remove the setter or make it `private`; rules own the value. | No |
+| CSLA0027 | Warning (**new**) | `[CalculatedProperty]` is used in a type that isn't a `BusinessBase`. There the value would stop being serialized without being recalculated. | No |
+| CSLA0028 | Error (**new**) | A `[MobileSerializer]`, `[MobileSerializerFor]` or `[assembly: MobileSerializerRegistration]` declaration can't be registered, so the generator skips it and the type isn't serializable. The serializer must be a non-abstract, non-open-generic class implementing `IMobileSerializer` with a public constructor; the target must be a non-generic class or struct that `MobileFormatter` doesn't already handle (not a primitive, `string`, `DateTime`, `Guid`, ... or an `IMobileObject`); neither may be a private/protected nested type. | No |
+| CSLA0029 | Warning (**new**) | A type is mapped to more than one custom serializer. Declare one. | No |
+| CSLA0030 | Warning (**new**) | Properties can't be generated, so code using them won't compile: `[CslaImplementProperties]` / `[CslaImplementPropertiesInterface<T>]` is not on a `partial class`/`partial struct`, the type doesn't inherit `BusinessBase`, `BusinessDocumentBase`, `ReadOnlyBase` or `CommandBase` (directly or through intermediate classes; `BusinessListBase` isn't supported), or `T` isn't an interface declared in the same project. | No |
 
 CSLA0001 ("business objects must be serializable") no longer exists. It was removed when CSLA stopped requiring `[Serializable]` (CSLA 9), although its documentation page still exists in the CSLA repository.
 
@@ -61,6 +74,19 @@ These come with the data portal operations generator (always on) and the data po
 | CSLADP011 | Warning | `CslaDataPortalExtensionsAsyncSuffix` is `none` but `CslaGenerateSyncDataPortalExtensions` is not `false`, so the sync methods (which would have the same names) are not generated. |
 
 CSLADP010 and CSLADP011 are compilation-level diagnostics with no source location, and are only reported when at least one class requests extension methods.
+
+## Diagnostic suppressors (CSLA1001 - CSLA1004)
+
+These suppress false positives from .NET code style and quality rules on CSLA code. Don't add `#pragma` or `[SuppressMessage]` for these cases; the suppressors already handle them.
+
+| ID | Suppresses | On |
+|---|---|---|
+| CSLA1001 | `IDE0051` (remove unused private member) | Data portal operations the data portal calls, and the object authorization rules method (a public static `[ObjectAuthorizationRules]` method, or a static `AddObjectAuthorizationRules` when there is none) |
+| CSLA1002 | `CA1822` (mark members as static) | Data portal operations. The data portal only calls instance methods, so making one static breaks it at runtime |
+| CSLA1003 | `IDE0060` (remove unused parameter) | Criteria parameters of data portal operations (they select the operation). `[Inject]` parameters, lambda/local function parameters and the context parameter of an object authorization rules method are not suppressed |
+| CSLA1004 | `IDE0058` (expression value is never used) | CSLA fluent configuration calls such as `services.AddCsla(...)`, `options.DataPortal(...)`, `proxy.WithDataPortalUrl(...)`. Not `Save()`/`SaveAsync()`: ignoring their result is a bug (CSLA0005/CSLA0006) |
+
+To turn a suppressor off, add its ID to `NoWarn`: `<NoWarn>$(NoWarn);CSLA1002</NoWarn>`. A `dotnet_diagnostic.CSLA1002.severity` setting in `.editorconfig` has no effect on suppressors.
 
 ## Build error CSLABUILD001
 
@@ -97,5 +123,18 @@ Run these code fixes with "Fix all occurrences in Solution" early in an upgrade:
 1. **CSLA0014**: adds the missing operation attributes. This is the most important one, because a method without an attribute is silently not called in CSLA 11 (or a base class method runs instead).
 2. **CSLA0024**: makes business classes `partial` so operations are dispatched without reflection.
 3. **CSLA0025**: only appears after you opt into `[DataPortalExtensions]`; switches calls to the strongly typed methods.
+
+Expect new **CSLA0007** warnings (errors with `TreatWarningsAsErrors`) on getters such as `=> GetProperty(NameProperty).ToUpper()`. Fix by moving the logic into a separate property, a business rule, or a justified suppression:
+
+```csharp
+// Wrong (CSLA0007 in CSLA 11)
+public string Name => GetProperty(NameProperty).ToUpper();
+
+// Right: keep the managed property simple, add a plain computed property
+public string Name => GetProperty(NameProperty)!;
+public string NameUpper => Name.ToUpper();
+```
+
+Remove `#pragma warning disable CSLA0007` around `GetProperty(...)!` getters; CSLA 11 doesn't report them.
 
 See [UpgradingToCsla11.md](UpgradingToCsla11.md), [DataPortalOperationDispatch.md](DataPortalOperationDispatch.md) and [DataPortalExtensions.md](DataPortalExtensions.md).

@@ -24,6 +24,27 @@ public void ConfigureServices(IServiceCollection services)
 }
 ```
 
+### Declaring PocoSerializer with an Attribute (CSLA 11)
+
+Instead of a `TypeMap` per type, put `[MobileSerializer]` on the POCO (or an assembly-level registration for a type you don't own) and register the assembly once. Analyzer CSLA0010 then stops reporting the POCO as a non-serializable criteria type:
+
+```csharp
+using Csla.Serialization.Mobile;
+using Csla.Serialization.Mobile.CustomSerializers;
+
+[MobileSerializer(typeof(PocoSerializer<CustomerCriteria>))]
+public class CustomerCriteria { /* ... */ }
+
+// For a third-party type
+[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
+
+services.AddCsla(options => options
+    .Serialization(s => s
+        .UseMobileFormatter(m => m.AddCustomSerializers(typeof(CustomerCriteria).Assembly))));
+```
+
+Pass every declaring assembly to `AddCustomSerializers` on client and server; an assembly that isn't passed fails at run time. Each declaration covers one exact, non-generic type. See `CustomSerializers.md`.
+
 ### Example POCO
 
 Your POCO requires no special attributes or interfaces:

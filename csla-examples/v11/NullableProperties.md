@@ -52,7 +52,7 @@ Use the rules below for properties you write by hand, such as lazy-loaded childr
 | Async lazy load (`LazyGetPropertyAsync`) | Nullable (`T?`) | `LazyGetPropertyAsync(XProperty, ...)` |
 | Value can legitimately be absent | Nullable (`T?`) | `GetProperty(XProperty)` |
 
-**Keep the `PropertyInfo<T>` type argument non-nullable**, even when the property is nullable. Use `PropertyInfo<CreditSummary>` with a `CreditSummary?` property, not `PropertyInfo<CreditSummary?>`. With `PropertyInfo<ShipmentInfo?>`, passing a `Task<ShipmentInfo>` to `LazyGetPropertyAsync` produces **CS8620**.
+**Keep the `PropertyInfo<T>` type argument non-nullable**, even when the property is nullable. Use `PropertyInfo<CreditSummary>` with a `CreditSummary?` property, not `PropertyInfo<CreditSummary?>`. With `PropertyInfo<ShipmentInfo?>`, a factory that returns `Task<ShipmentInfo>` (such as `FetchChildAsync`) doesn't match the `Func<Task<ShipmentInfo?>>` that `LazyGetPropertyAsync` expects, and produces a nullability warning.
 
 ## Examples
 
@@ -91,23 +91,29 @@ get => LazyGetProperty(FlexViewPanelsProperty,
 
 ### Asynchronous Lazy-Loaded Child
 
-The first read returns `null`, so the property must be nullable. `LazyGetPropertyAsync` takes a `Task<P>`, and the task is already running when it's passed in. Check whether the value is loaded or loading first, or every read starts another fetch:
+The first read returns `null`, so the property must be nullable. Pass `LazyGetPropertyAsync` a factory (`Func<Task<P>>`). The factory only runs when the value isn't loaded and isn't already loading, so reading the property again doesn't start another fetch:
 
 ```csharp
 public static readonly PropertyInfo<ShipmentInfo> ShipmentProperty =
     RegisterProperty<ShipmentInfo>(nameof(Shipment), RelationshipTypes.LazyLoad);
-[SuppressMessage("Usage", "CSLA0007", Justification = "The guard keeps each read from starting another fetch.")]
-public ShipmentInfo? Shipment
-{
-    get
-    {
-        if (FieldManager.FieldExists(ShipmentProperty) || PropertyIsLoading(ShipmentProperty))
-            return GetProperty(ShipmentProperty);
-        return LazyGetPropertyAsync(ShipmentProperty,
-            ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
-    }
-}
+public ShipmentInfo? Shipment =>
+    LazyGetPropertyAsync(ShipmentProperty,
+        () => ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
 ```
+
+The getter only calls a property method, so it needs no CSLA0007 suppression and no `FieldManager.FieldExists` / `PropertyIsLoading` guard.
+
+Don't pass a `Task<P>`:
+
+```csharp
+// Wrong: the Task<P> overload is obsolete (CS0618), and the task is created and
+// started on every read, so every read starts another fetch
+public ShipmentInfo? Shipment =>
+    LazyGetPropertyAsync(ShipmentProperty,
+        ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
+```
+
+When upgrading CSLA 10 code, replace the guarded getter (`if (FieldManager.FieldExists(...) || PropertyIsLoading(...)) return GetProperty(...);` plus a `[SuppressMessage]` for CSLA0007) with the factory form above.
 
 Callers either handle `null` (UI data binding updates on `PropertyChanged`) or wait for the load:
 
@@ -142,7 +148,7 @@ Analyzer **CSLA0007** ("Properties that use managed backing fields should only u
 
 CSLA 10 and CSLA 11 prereleases up to 11.0.0-alpha.2 report CSLA0007 on these getters by mistake. Keep the `!` and ignore the warning there, rather than removing the `!`.
 
-The guarded async lazy getter shown above does more than call a property method, so it still needs the `[SuppressMessage]` for CSLA0007.
+The factory form of `LazyGetPropertyAsync` shown above only calls a property method, so CSLA0007 accepts it.
 
 ## Common Mistakes
 
@@ -150,7 +156,8 @@ The guarded async lazy getter shown above does more than call a property method,
 * **Making a property nullable only to silence CS8603**: callers then have to null-check a value that's never null.
 * **`PropertyInfo<T?>` for a nullable property**: keep the type argument non-nullable.
 * **Non-nullable property with `LazyGetPropertyAsync`**: the first read is always `null`.
-* **Creating the `Task` on every read in an async lazy getter**: starts a new fetch on each read. Guard it as shown above.
+* **Passing a `Task<P>` to `LazyGetPropertyAsync`**: obsolete (CS0618) and starts a new fetch on each read. Pass a factory: `() => portal.FetchChildAsync(Id)`.
+* **Passing `null` as the factory**: doesn't compile (CS0121, ambiguous between the overloads).
 
 ## Related Documents
 

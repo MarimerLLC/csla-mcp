@@ -15,6 +15,20 @@ This document applies to CSLA 11. It is a practical checklist for upgrading code
 9. Optional: adopt strongly typed data portal calls with `[DataPortalExtensions]`. [Details](#optional-strongly-typed-data-portal-calls)
 10. Only if the app is trimmed or compiled with NativeAOT: follow the trimming and NativeAOT guide. [Details](#only-if-you-use-trimming-or-nativeaot)
 11. If a Blazor app uses state management (`UseInMemoryApplicationContextManager = false`), check `SessionExpiration`: sessions idle for 1 hour are now purged automatically. [Details](#blazor-sessions-are-purged-automatically)
+12. Check rules that depend on `CheckRules()` order or rerun behavior: priority now applies across all properties, and reruns only follow output values. `UseLegacyCheckRules()` restores CSLA 10 behavior temporarily. [Details](#checkrules-runs-rules-as-a-batch)
+13. Add `IsSequential` to custom `IBusinessRuleBase` implementations that don't inherit `BusinessRuleBase`. Optionally set `IsSequential = true` on async rules that later rules depend on. [Details](#sequential-async-rules)
+14. Review handlers for `PropertyChanged`, `ValidationComplete` and `BusyChanged`, code after `await WaitForIdle()`, and custom `IHostRules` implementations (add `PropertyIdle`). [Details](#async-rule-completion-reports-idle-last)
+15. Replace `MarkClean()`/`MarkOld()` calls that undo dirtiness from rule-calculated values with `[CalculatedProperty]`; add `IsCalculated` to custom `IPropertyInfo` implementations; check `[DoNotSerialize]` properties that hold objects. [Details](#calculated-properties-and-donotserialize)
+16. Pass a factory to `LazyGetPropertyAsync` / `LazyReadPropertyAsync` instead of a `Task<P>` (CS0618), and drop the loaded/loading guard. [Details](#lazygetpropertyasync-and-lazyreadpropertyasync-take-a-factory)
+17. Fix new CSLA0007 warnings on getters like `=> GetProperty(P).ToUpper()`, and remove CSLA0007 suppressions on `GetProperty(P)!` getters. [Details](#csla0007-reports-more-property-getters)
+18. Optional: declare `MobileFormatter` custom serializers with attributes so CSLA0010 stops reporting their types. [Details](#custom-serializers-can-be-declared-with-attributes)
+19. Replace `IsDbNullAsync` with `IsDBNullAsync`, and recompile code that uses `SafeSqlDataReader`. [Details](#async-safedatareader)
+20. ASP.NET Core MVC / Razor Pages: check controller code that relies on the old `CslaModelBinder` behavior. [Details](#aspnet-core-cslamodelbinder-binds-whole-object-graphs)
+21. Move `OnGetState`/`OnSetState` overrides that take a `StateMode` to the `SerializationInfo`-only overloads. [Details](#statemode-is-obsolete)
+22. Remove `MobileReader<T>()` / `MobileWriter<T>()` configuration that names the removed `CslaXml*` readers and writers. [Details](#cslaxml-readers-and-writers-removed)
+23. View models: XAML `SaveAsync`/`RefreshAsync` no longer throw; Blazor `OnModelChanged()` overrides take `(T? oldValue, T? newValue)`; `ManageObjectLifetime` defaults to `true` on MAUI and Avalonia. [Details](#view-models)
+24. Stop using the CSLA `dotnet new` templates and the Visual Studio template installer; they are removed. [Details](#other-removals)
+25. Projects that reference `Csla.Analyzers.dll` directly by path: add `Csla.Analyzers.CodeFixes.dll`. [Details](#analyzer-changes)
 
 ## Target frameworks
 
@@ -460,6 +474,237 @@ builder.Services.AddCsla(o => o
 
 See "Purging Expired Sessions" in [BlazorConfiguration.md](../BlazorConfiguration.md#purging-expired-sessions-csla-11) for how the service behaves.
 
+## `CheckRules()` runs rules as a batch
+
+`BusinessRules.CheckRules()` and `CheckRulesAsync()` now:
+
+1. run object-level rules first;
+2. run every property rule once, in priority order **across all properties** (CSLA 10 only ordered by priority within one property);
+3. rerun only the rules of properties changed through `context.AddOutValue`, and the rules that use those properties as inputs; with `CascadeOnDirtyProperties = true`, repeat until nothing changes, and throw `InvalidOperationException` after `MaxRerunPasses` passes (default 100) instead of overflowing the stack.
+
+What breaks:
+
+* A rule that changes another property by writing to the target object (not `AddOutValue`) no longer triggers the dependent rules during `CheckRules()`. Change it to use `context.AddOutValue`.
+* Rules of `AffectedProperties` don't rerun on their own in `CheckRules()`.
+* `CascadeIfDirty` has no effect in `CheckRules()` (it still applies to `CheckRules(property)`).
+* Tests that assert how many times a rule ran, or in what order across properties, need updating.
+
+`CheckRules(property)`, the rules that run when a property is set, and `CheckObjectRules()` are unchanged.
+
+```csharp
+// Configure the batch runner (default)
+services.AddCsla(o => o.Rules(r => r.UseBatchCheckRules(b => b.MaxRerunPasses = 200)));
+
+// Temporarily keep the CSLA 10 behavior; will be removed in a future version
+services.AddCsla(o => o.Rules(r => r.UseLegacyCheckRules()));
+```
+
+See [CheckRulesExecution.md](CheckRulesExecution.md).
+
+## Sequential async rules
+
+`IBusinessRuleBase` has a new `IsSequential` property. Rules that inherit `BusinessRuleBase` (`BusinessRule`, `BusinessRuleAsync`, the built-in rules) already have it. A custom implementation of `IBusinessRuleBase`, `IBusinessRule` or `IBusinessRuleAsync` that doesn't inherit `BusinessRuleBase` must add it:
+
+```csharp
+public bool IsSequential => !IsAsync;   // true for a sync rule, false for an async rule
+```
+
+Optional: set `IsSequential = true` on a `BusinessRuleAsync` so later rules (for every property) wait for it and short-circuit on its result, like a sync rule:
+
+```csharp
+BusinessRules.AddRule(new CustomerExists(CustomerIdProperty) { Priority = 1, IsSequential = true });
+```
+
+With the batch runner, `CheckRulesAsync()` and `CheckRulesAsync(property)` also return the properties affected by the async rules they started. See [SequentialAsyncRules.md](SequentialAsyncRules.md).
+
+## Async rule completion reports idle last
+
+When an async rule completes, the object now raises, in this order: `PropertyChanged` for the rule's properties, the `IsSelfValid`/`IsValid`/`IsSavable` changes, `ValidationComplete`, and only then `BusyChanged(property, false)` and the `IsSelfBusy`/`IsBusy` changes.
+
+What to check:
+
+* Handlers of `PropertyChanged`, `ValidationComplete` and `IsValid` changes now see `IsBusy == true` and `IsPropertyBusy(property) == true` for the completing rule.
+* Code after `await WaitForIdle()` or `await CheckRulesAsync()` always continues asynchronously, after all completion notifications. It is now safe to dispose a DI scope there. Don't dispose resources the object uses from inside the idle notification handlers.
+* Custom `IHostRules` implementations: `RuleComplete(IPropertyInfo)` no longer raises `BusyChanged`. Add `PropertyIdle(IPropertyInfo)` and raise your busy notification there.
+* A `CommandBase` returned by a create, fetch or execute waits on the server until the objects in its managed properties are idle (fails with `TimeoutException` after `DefaultWaitForIdleTimeoutInSeconds`). Objects held in private fields aren't covered; await them in the operation method.
+
+## Calculated properties and `[DoNotSerialize]`
+
+Replace this CSLA 10 workaround:
+
+```csharp
+// CSLA 10: calculated values made a freshly fetched object dirty
+[Fetch]
+private void Fetch(int id, [Inject] IOrderDal dal)
+{
+  // ... load properties
+  BusinessRules.CheckRules();
+  MarkOld();   // or MarkClean(), only to undo dirtiness from calculated values
+}
+```
+
+with `[CalculatedProperty]` on the rule-calculated property, and remove the extra `MarkOld()`/`MarkClean()`:
+
+```csharp
+[CalculatedProperty]
+public partial decimal Total { get; private set; }   // CSLA0026: no setter or a private setter
+```
+
+A calculated property is not serialized, never marks the object dirty, and is recalculated by its rules after deserialization. Only in `BusinessBase` types (CSLA0027). See [CalculatedProperties.md](CalculatedProperties.md).
+
+Also:
+
+* `IPropertyInfo` has a new `IsCalculated` member. Custom `IPropertyInfo` implementations (not derived from `PropertyInfo<T>`) must add it; return `false` to keep CSLA 10 behavior.
+* A `[DoNotSerialize]` property (or one registered with `isSerializable: false`) that holds an object value, such as a child object or `MobileList<T>`, is no longer serialized, and stays excluded after `CancelEdit`. Remove the attribute if the value must reach the other side of the data portal.
+
+## `LazyGetPropertyAsync` and `LazyReadPropertyAsync` take a factory
+
+The overloads that take a `Task<P>` are obsolete (CS0618). Pass a `Func<Task<P>>`; it only runs when the value isn't loaded and isn't loading, so the `FieldManager.FieldExists` / `PropertyIsLoading` guard and its CSLA0007 suppression go away:
+
+```csharp
+// CSLA 10
+public ShipmentInfo? Shipment
+{
+  get
+  {
+    if (FieldManager.FieldExists(ShipmentProperty) || PropertyIsLoading(ShipmentProperty))
+      return GetProperty(ShipmentProperty);
+    return LazyGetPropertyAsync(ShipmentProperty,
+      ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
+  }
+}
+
+// CSLA 11
+public ShipmentInfo? Shipment =>
+  LazyGetPropertyAsync(ShipmentProperty,
+    () => ApplicationContext.GetRequiredService<IChildDataPortal<ShipmentInfo>>().FetchChildAsync(Id));
+```
+
+* Passing `null` as the second argument no longer compiles (CS0121).
+* A factory (or `Task<P>`) that fails raises `UnhandledAsyncException` and the getter returns the default value; the next read tries again. It no longer throws `InvalidOperationException` from the getter.
+
+See [NullableProperties.md](NullableProperties.md).
+
+## CSLA0007 reports more property getters
+
+* **New warnings:** expression-bodied getters that call a property method inside another call, such as `public string Name => GetProperty(NameProperty).ToUpper();`. Move the logic into a separate plain property or a business rule, or suppress with a justification. Builds with `TreatWarningsAsErrors` fail until fixed.
+* **Fewer warnings:** `get => GetProperty(NameProperty)!;` is no longer reported. Remove those suppressions.
+* The warning is reported on the accessor's expression or body rather than the whole accessor, so a `[SuppressMessage]` scoped to the old location may need moving.
+* Generated `[CslaImplementProperties]` properties are no longer wrapped in `#pragma warning disable CSLA0007`; they don't produce warnings.
+
+## Custom serializers can be declared with attributes
+
+Optional. Existing `CustomSerializers.Add(new TypeMap<T, S>(...))` registration keeps working, and is still required for generic types. To let analyzer CSLA0010 see your serializers, declare them and register each declaring assembly:
+
+```csharp
+[MobileSerializer(typeof(MoneySerializer))]        // on a type you own
+public class Money { /* ... */ }
+
+[MobileSerializerFor(typeof(ThirdParty.Widget))]    // on a serializer, for a type you don't own
+public class WidgetSerializer : IMobileSerializer { /* ... */ }
+
+builder.Services.AddCsla(o => o
+  .Serialization(s => s
+    .UseMobileFormatter(m => m.AddCustomSerializers(typeof(Money).Assembly))));
+```
+
+An assembly that isn't passed to `AddCustomSerializers` satisfies the analyzer but fails at run time. New analyzers: CSLA0028 (invalid declaration), CSLA0029 (more than one serializer for a type). See [CustomSerializers.md](CustomSerializers.md).
+
+## Async `SafeDataReader`
+
+`SafeDataReader` now has async members: `ReadAsync`, `NextResultAsync`, `CloseAsync`, `IsDBNullAsync`, `GetFieldValueAsync<T>` (by ordinal or column name), null-safe getters such as `GetStringAsync`, `GetInt32Async`, `GetDateTimeAsync`, `GetSmartDateAsync`, and `DisposeAsync`:
+
+```csharp
+await using var dr = new SafeDataReader(await cm.ExecuteReaderAsync());
+while (await dr.ReadAsync())
+{
+  var name = await dr.GetStringAsync("Name");
+  var age = await dr.GetInt32Async("Age");
+}
+```
+
+* `IsDbNullAsync` is obsolete: use `IsDBNullAsync`.
+* `SafeSqlDataReader` inherits `ReadAsync`, `NextResultAsync` and `GetFieldValueAsync<T>` from `SafeDataReader` (same signatures). Recompile code built against CSLA 10. They no longer throw `NotSupportedException` when the wrapped reader isn't a `SqlDataReader`.
+
+## ASP.NET Core `CslaModelBinder` binds whole object graphs
+
+In MVC and Razor Pages, `CslaModelBinder` (registered by `AddAspNetCore()`) now:
+
+* binds editable child objects and child lists at any depth (`Children[0].GrandChildren[1].Name`);
+* binds into the object passed to `TryUpdateModelAsync`, setting only posted values (CSLA 10 bound a separate object, so posted values never reached yours);
+* honors `[BindNever]`, `[Bind]` and the `TryUpdateModelAsync` include list;
+* waits for async business rules in the graph;
+* no longer sets unposted child properties to `null`;
+* binds a request that isn't a form post to a new object instead of throwing.
+
+Remove workarounds that copied posted values into a fetched object by hand. See [AspNetCoreModelBinding.md](AspNetCoreModelBinding.md).
+
+## `StateMode` is obsolete
+
+Override the `SerializationInfo`-only overloads:
+
+```csharp
+// CSLA 10 (now CS0672/CS0618)
+protected override void OnGetState(SerializationInfo info, StateMode mode) { /* ... */ }
+protected override void OnSetState(SerializationInfo info, StateMode mode) { /* ... */ }
+
+// CSLA 11
+protected override void OnGetState(SerializationInfo info)
+{
+  base.OnGetState(info);
+  info.AddValue("_custom", _custom);
+}
+
+protected override void OnSetState(SerializationInfo info)
+{
+  base.OnSetState(info);
+  _custom = info.GetValue<string>("_custom");
+}
+```
+
+Delete any `if (mode == StateMode.Undo)` branch: n-level undo takes snapshots through the serializer and never passes `StateMode.Undo`. Old overrides still run until you move them.
+
+## CslaXml readers and writers removed
+
+`CslaXmlReader`, `CslaXmlWriter`, `CslaXmlBinaryReader`, `CslaXmlBinaryWriter` and `CslaReaderWriterFactory.GetDataContractSerializer()` are removed. Delete configuration that selects them:
+
+```csharp
+// Remove
+.UseMobileFormatter(m => m
+  .MobileReader<CslaXmlBinaryReader>()
+  .MobileWriter<CslaXmlBinaryWriter>())
+```
+
+The default `CslaBinaryReader`/`CslaBinaryWriter` use a different wire format, so update client and server together.
+
+## View models
+
+The Blazor, WPF, MAUI and Avalonia view models now share `Csla.Mvvm.ViewModel<T>` (in the `Csla` package). See [ViewModels.md](ViewModels.md). Breaking changes:
+
+* **All:** `SaveAsync` returns `Task<T?>` (the saved model). An authorization rule that throws while `CanSave`, `CanEditObject` and the other status properties are calculated is captured in `Exception`/`ViewModelErrorText` and raises `Error`.
+* **XAML (WPF, MAUI, Avalonia):** `SaveAsync` and `RefreshAsync` no longer throw. Check `Exception` and `ViewModelErrorText`, or handle `Error`, instead of `try`/`catch`. An invalid model isn't saved and only sets `ViewModelErrorText`:
+
+  ```csharp
+  // CSLA 10
+  try { await vm.SaveAsync(); await NavigateBack(); }
+  catch (Exception ex) { ShowError(ex); }
+
+  // CSLA 11
+  await vm.SaveAsync();
+  if (vm.Exception is null && string.IsNullOrEmpty(vm.ViewModelErrorText))
+    await NavigateBack();
+  else
+    ShowError(vm.ViewModelErrorText);
+  ```
+
+* **MAUI and Avalonia:** `ManageObjectLifetime` defaults to `true` (set `false` to keep CSLA 10 behavior); the public `ManageObjectLifetimeProperty` field is removed (use the `ManageObjectLifetime` property). On MAUI, `BeginAddNew` is obsolete: use `DoAddNew`.
+* **XAML:** `RefreshAsync<F>(factory)` is obsolete; call `RefreshAsync(factory)`.
+* **Blazor:** replace `protected override void OnModelChanged()` with `protected override void OnModelChanged(T? oldValue, T? newValue)` and call `base.OnModelChanged(oldValue, newValue)`.
+
+## Other removals
+
+* The CSLA `dotnet new` templates (`Support/Templates`) and the Visual Studio template installer are removed. Create projects with the standard .NET templates and add the `Csla` packages.
+
 ## Only if you use trimming or NativeAOT
 
 CSLA 11 supports trimmed and NativeAOT apps. This section only applies if your app is published with `PublishTrimmed` or `PublishAot`, which includes Blazor WebAssembly (always trimmed) and .NET MAUI on iOS and Android (trimmed by default). Apps that aren't trimmed need no changes.
@@ -469,6 +714,10 @@ CSLA 11 marks APIs that can't work safely after trimming with `[RequiresUnrefere
 ## Analyzer changes
 
 * CSLA0014 is now a warning (was info).
-* New: CSLA0024 (partial), CSLA0025 (use generated extension method), CSLADP002-CSLADP011 (generator diagnostics).
+* CSLA0007 reports more getters and accepts `GetProperty(P)!` (see [above](#csla0007-reports-more-property-getters)).
+* CSLA0010 no longer reports types with a declared custom serializer, including `ClaimsPrincipal`.
+* New: CSLA0024 (partial), CSLA0025 (use generated extension method), CSLA0026/CSLA0027 (`[CalculatedProperty]`), CSLA0028/CSLA0029 (serializer declarations), CSLA0030 (properties can't be generated), CSLADP002-CSLADP011 (generator diagnostics).
+* New diagnostic suppressors CSLA1001-CSLA1004 hide `IDE0051`, `CA1822`, `IDE0060` and `IDE0058` false positives on data portal operations and CSLA configuration calls. Remove your own suppressions for those cases.
+* The code fixes moved to `Csla.Analyzers.CodeFixes.dll` (in the `Csla` package). Only projects that reference `Csla.Analyzers.dll` directly by path need to add it.
 
 See [Analyzers.md](Analyzers.md) for the full list.

@@ -82,7 +82,7 @@ public class ValidZipCode : BusinessRule
     
     protected override void Execute(IRuleContext context)
     {
-        var zipCode = (string)context.InputPropertyValues[PrimaryProperty];
+        var zipCode = (string?)context.InputPropertyValues[PrimaryProperty!];
         
         if (string.IsNullOrWhiteSpace(zipCode))
             return; // Don't validate empty values (use Required rule for that)
@@ -200,6 +200,7 @@ public partial class OrderItem : BusinessBase<OrderItem>
 {
     public partial int Quantity { get; set; }
     public partial decimal Price { get; set; }
+    [CalculatedProperty]  // not serialized, never marks the object dirty, recalculated after deserialization
     public partial decimal Total { get; private set; } // Calculated by rule
     
     protected override void AddBusinessRules()
@@ -210,6 +211,8 @@ public partial class OrderItem : BusinessBase<OrderItem>
     }
 }
 ```
+
+Mark a rule-calculated property `[CalculatedProperty]` instead of calling `MarkClean()` / `MarkOld()` after `CheckRules()` to undo the dirty state the calculated value causes. See `CalculatedProperties.md`.
 
 ### Async Business Rule
 
@@ -226,7 +229,7 @@ public class CheckEmailUnique : BusinessRuleAsync
     
     protected override async Task ExecuteAsync(IRuleContext context)
     {
-        var email = (string)context.InputPropertyValues[PrimaryProperty];
+        var email = (string?)context.InputPropertyValues[PrimaryProperty!];
         
         if (string.IsNullOrWhiteSpace(email))
             return;
@@ -257,6 +260,19 @@ public partial class Customer : BusinessBase<Customer>
 ```
 
 > **Note:** A rule's `Execute` or `ExecuteAsync` method must NEVER directly talk to the database or any external API. Any such operations MUST flow through something like a command object.
+
+By default an async rule runs in the background: later rules don't wait for it, and its result doesn't short-circuit them. When later rules depend on its result (for example a rule that is async only because it checks the database), set `IsSequential = true`:
+
+```csharp
+BusinessRules.AddRule(new CheckEmailUnique(EmailProperty) { IsSequential = true });
+```
+
+* Rules after a sequential rule, for every property, wait for it to complete; an `Error` result or `StopProcessing` short-circuits them like a sync rule.
+* Set `IsSequential` when the rule is added (setting it after the rule has run throws `ArgumentException`).
+* A custom rule that implements `IBusinessRuleBase` without inheriting `BusinessRuleBase` must implement `IsSequential` (`true` for sync, `false` for async).
+* The legacy runner (`UseLegacyCheckRules()`) ignores it.
+
+When an async rule completes, the object raises `PropertyChanged`, the `IsValid`/`IsSavable` changes and `ValidationComplete` before `BusyChanged`, and code after `await WaitForIdle()` or `await CheckRulesAsync()` always continues asynchronously. See `SequentialAsyncRules.md`.
 
 ## Authorization Rules
 
@@ -553,7 +569,42 @@ protected override void AddBusinessRules()
 }
 ```
 
-> **Note:** Async rules do not honor priorities. They run asynchronously and potentially in parallel, resulting in non-deterministic completion order. Only synchronous rules execute in priority order.
+Async rules start in priority order, but by default they run in the background, so later rules don't wait for them and their completion order is non-deterministic. Set `IsSequential = true` on a `BusinessRuleAsync` to make later rules wait for it and short-circuit on its result, like a sync rule:
+
+```csharp
+BusinessRules.AddRule(new CheckEmailUnique(EmailProperty) { Priority = 1, IsSequential = true });
+```
+
+See `SequentialAsyncRules.md`.
+
+### How `CheckRules()` orders rules in CSLA 11
+
+`BusinessRules.CheckRules()` (and `CheckRulesAsync()`) runs rules as a batch:
+
+1. Object-level rules run first.
+2. Every property rule runs once, in priority order **across all properties**. A `Priority = 1` rule on `Name` runs before a `Priority = 2` rule on `Email`. Equal priorities run by property (in the order the property's first rule was added), then in the order the rules were added.
+3. Rules rerun only when a rule changed a value through `context.AddOutValue`: the rules of the changed property, and the rules that use it as an input property, run again once. With `CascadeOnDirtyProperties = true` this repeats until no value changes, and throws `InvalidOperationException` after `MaxRerunPasses` passes (default 100).
+
+Consequences for rule code:
+
+* Change other properties only through `context.AddOutValue`. A rule that writes to the target object directly doesn't trigger reruns in `CheckRules()`.
+* `AffectedProperties` alone don't make rules rerun in `CheckRules()`; they already ran once in the batch.
+* `CascadeIfDirty` has no effect in `CheckRules()`. It still applies to `CheckRules(property)`.
+* Short-circuiting (`ProcessThroughPriority`, `StopProcessing`) still applies per property.
+* `CheckRules(property)`, the rules that run when a property is set, and `CheckObjectRules()` are unchanged.
+
+Configure it in `AddCsla`:
+
+```csharp
+services.AddCsla(o => o
+    .Rules(r => r.UseBatchCheckRules(b => b.MaxRerunPasses = 200)));   // default 100
+
+// Temporary: CSLA 10 behavior (priority only within a property, recursive cascading)
+services.AddCsla(o => o
+    .Rules(r => r.UseLegacyCheckRules()));
+```
+
+See `CheckRulesExecution.md`.
 
 ## Rule Severity Levels
 
@@ -562,7 +613,7 @@ Rules can have different severity levels:
 ```csharp
 protected override void Execute(IRuleContext context)
 {
-    var value = (string)context.InputPropertyValues[PrimaryProperty];
+    var value = (string?)context.InputPropertyValues[PrimaryProperty!];
     
     if (string.IsNullOrWhiteSpace(value))
     {
@@ -688,7 +739,7 @@ public class RequiredIfNew : BusinessRule
             return; // Don't validate if not new
         }
         
-        var value = context.InputPropertyValues[PrimaryProperty];
+        var value = context.InputPropertyValues[PrimaryProperty!];
         if (value == null || string.IsNullOrWhiteSpace(value.ToString()))
         {
             context.AddErrorResult("Password is required for new objects");
@@ -795,11 +846,33 @@ public class UpdateFullName : BusinessRule
     
     protected override void Execute(IRuleContext context)
     {
-        var firstName = (string)context.InputPropertyValues[_firstNameProperty];
-        var lastName = (string)context.InputPropertyValues[_lastNameProperty];
+        var firstName = (string?)context.InputPropertyValues[_firstNameProperty];
+        var lastName = (string?)context.InputPropertyValues[_lastNameProperty];
         
         var fullName = $"{firstName} {lastName}".Trim();
         context.AddOutValue(_fullNameProperty, fullName);
     }
 }
+
+// Usage: the rule's primary property is FullName, so add Dependency rules
+// to run it when FirstName or LastName changes
+[CslaImplementProperties]
+public partial class Person : BusinessBase<Person>
+{
+    public partial string FirstName { get; set; }
+    public partial string LastName { get; set; }
+
+    [CalculatedProperty]
+    public partial string FullName { get; private set; }
+
+    protected override void AddBusinessRules()
+    {
+        base.AddBusinessRules();
+        BusinessRules.AddRule(new UpdateFullName(FirstNameProperty, LastNameProperty, FullNameProperty));
+        BusinessRules.AddRule(new Dependency(FirstNameProperty, FullNameProperty));
+        BusinessRules.AddRule(new Dependency(LastNameProperty, FullNameProperty));
+    }
+}
 ```
+
+Set the value with `context.AddOutValue`, not by writing to the target object. In CSLA 11, `CheckRules()` only reruns the rules that depend on `FullName` when an output value changed it.

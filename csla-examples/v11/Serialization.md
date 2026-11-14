@@ -112,6 +112,33 @@ services.AddCsla(options => options
     })));
 ```
 
+### Declaring Serializers with Attributes
+
+Instead of a `TypeMap` per type, declare the serializer on the type (or on the serializer) and register the assembly once:
+
+```csharp
+using Csla.Serialization.Mobile;
+using Csla.Serialization.Mobile.CustomSerializers;
+
+[MobileSerializer(typeof(PocoSerializer<AddressInfo>))]
+public class AddressInfo { /* ... */ }
+
+[MobileSerializerFor(typeof(ThirdParty.Widget))]       // type you don't own
+public class WidgetSerializer : IMobileSerializer { /* ... */ }
+
+[assembly: MobileSerializerRegistration(typeof(ThirdParty.Gadget), typeof(PocoSerializer<ThirdParty.Gadget>))]
+
+services.AddCsla(options => options
+    .Serialization(so => so.UseMobileFormatter(mf =>
+        mf.AddCustomSerializers(typeof(AddressInfo).Assembly))));
+```
+
+* Pass every assembly that declares serializers to `AddCustomSerializers`; nothing is scanned automatically.
+* Each declaration covers the exact type only, not derived types. Generic target types still need `TypeMap`.
+* Analyzer CSLA0010 doesn't report operation arguments of declared types; CSLA0028 reports invalid declarations and CSLA0029 types with more than one serializer.
+
+See `CustomSerializers.md`.
+
 ### Implementing IMobileSerializer
 
 For more control, implement `IMobileSerializer`:
@@ -367,6 +394,29 @@ stream.Position = 0;
 var restored2 = (MyBusinessObject)formatter.Deserialize(stream);
 ```
 
+## Serialization Rules Specific to CSLA 11
+
+* **Custom private-field state**: override `OnGetState(SerializationInfo info)` and `OnSetState(SerializationInfo info)`. The overloads that take a `StateMode` are obsolete (CS0672/CS0618), and `StateMode.Undo` is never passed, so delete any `mode == StateMode.Undo` branch.
+
+  ```csharp
+  protected override void OnGetState(SerializationInfo info)
+  {
+      base.OnGetState(info);
+      info.AddValue("_custom", _custom);
+  }
+
+  protected override void OnSetState(SerializationInfo info)
+  {
+      base.OnSetState(info);
+      _custom = info.GetValue<string>("_custom");
+  }
+  ```
+
+* **`CslaXmlReader`, `CslaXmlWriter`, `CslaXmlBinaryReader`, `CslaXmlBinaryWriter` and `CslaReaderWriterFactory.GetDataContractSerializer()` are removed.** Remove any `MobileReader<...>()` / `MobileWriter<...>()` call that names them, so the default `CslaBinaryReader` / `CslaBinaryWriter` are used. The wire format changes, so deploy client and server together.
+* **`[DoNotSerialize]` excludes object values too.** A managed property marked `[DoNotSerialize]` (or registered with `isSerializable: false`) that holds an object (child object, `MobileList<T>`) is not serialized, and it stays excluded after `CancelEdit`. Remove the attribute if the value must travel through the data portal.
+* **`[CalculatedProperty]`** values are not serialized and are recalculated by their rules after deserialization. See `CalculatedProperties.md`.
+* Editable lists and `BusinessDocumentBase` don't serialize an empty deleted list. This only shrinks the payload; no code change.
+
 ## Best Practices
 
 1. **Use the default** - `MobileFormatter` works for most scenarios without configuration
@@ -393,8 +443,9 @@ Error: `MustImplementIMobileObject`
 
 **Solution**: 
 - For POCO types, use `[AutoSerializable]` attribute
-- Register a custom serializer in `MobileFormatterOptions.CustomSerializers`
+- Declare a serializer with `[MobileSerializer]` / `[MobileSerializerFor]` and pass the assembly to `MobileFormatterOptions.AddCustomSerializers`, or register a `TypeMap` in `MobileFormatterOptions.CustomSerializers`
 - Use `PocoSerializer<T>` for simple types
+- If the type has a declared serializer, check that its assembly was passed to `AddCustomSerializers` on both client and server
 
 ### Type resolution fails during deserialization
 
